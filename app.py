@@ -179,9 +179,14 @@ HTML_UI = """<!DOCTYPE html>
             padding: 26px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
             animation: slideIn 0.3s ease-out;
+            transition: all 0.3s ease;
+        }
+        .card.new-incoming {
+            border-color: #38bdf8;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
         }
         @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
+            from { opacity: 0; transform: translateY(-15px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .timing-strip {
@@ -419,10 +424,32 @@ HTML_UI = """<!DOCTYPE html>
     </div>
 
     <script>
+        // Universal Web Audio API Alert for ANY New Incoming News
+        function playAnyNewsAlert() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2); // Up to A5
+                
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } catch(e) {}
+        }
+
         const container = document.getElementById("news-container");
         const renderedIds = new Set();
 
-        function addCard(d) {
+        function addCard(d, isInitialLoad = false) {
             const cardId = d.display_title + (d.card_time || "");
             if (renderedIds.has(cardId)) return;
             renderedIds.add(cardId);
@@ -432,6 +459,12 @@ HTML_UI = """<!DOCTYPE html>
 
             const card = document.createElement("div");
             card.className = "card";
+            
+            // Highlight live incoming news with visual glow
+            if (!isInitialLoad) {
+                card.classList.add("new-incoming");
+                playAnyNewsAlert();
+            }
 
             const rawBias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
             const biasClass = rawBias.includes("BULL") ? "BULLISH" : (rawBias.includes("BEAR") ? "BEARISH" : "NEUTRAL");
@@ -519,8 +552,13 @@ HTML_UI = """<!DOCTYPE html>
                 if (e.data === "pong") return;
                 try {
                     const data = JSON.parse(e.data);
-                    if (Array.isArray(data)) { data.forEach(addCard); }
-                    else { addCard(data); }
+                    if (Array.isArray(data)) { 
+                        // Initial cache load (skip sound)
+                        data.forEach(item => addCard(item, true)); 
+                    } else { 
+                        // Any new incoming real-time news (plays sound & flashes border)
+                        addCard(data, false); 
+                    }
                 } catch(err) {}
             };
 
