@@ -33,30 +33,35 @@ def generate_text_hash(text):
     return hashlib.md5(clean.encode()).hexdigest()
 
 SYSTEM_PROMPT = """You are an institutional cryptocurrency quantitative macro strategist.
-Carefully read the ENTIRE content of the breaking news or tweet.
-1. Create a CONCISE, PUNCHY ENGLISH HEADLINE (summarized_english_title) summarizing the core event in English (Max 1 sentence).
-2. Provide a 3-bullet-point Sinhala summary of the news itself (news_points).
-3. Analyze how this specifically impacts BITCOIN (BTC) spot/perp markets, liquidity, and orderbook.
-4. Action plan MUST be ultra-short (under 20 words), focusing on Spot CVD, DOM absorption, and Orderbook walls.
+Analyze the breaking news/tweet strictly for BITCOIN (BTC) orderflow impact.
+
+LANGUAGE INSTRUCTIONS:
+- 'summarized_english_title' MUST be in concise English.
+- EVERY OTHER FIELD (news_points, core_catalyst, cvd_orderbook_impact, liquidity_traps, verdict, action_plan) MUST BE 100% IN FLUENT, NATURAL SINHALA ONLY.
+- DO NOT OUTPUT ANY ENGLISH IN THE ANALYSIS FIELDS.
+
+CRITICAL RULES:
+- NO fake dollar prices (e.g. no $30k, $80k, etc.).
+- Action Plan must be a SHORT, direct 1-2 sentence tactical recommendation in pure Sinhala (under 20 words).
 
 Respond ONLY with a valid JSON object:
 {
-  "summarized_english_title": "Short sharp English headline",
+  "summarized_english_title": "Short sharp English headline (Max 1 sentence)",
   "impact_mark": "උදා: 1.5 / 10 — NOISE හෝ 8.0 / 10 — HIGH ALPHA",
   "directional_bias": "මධ්‍යස්ථ (Neutral) හෝ Bullish හෝ Bearish",
-  "expected_move": "±$0-$50 හෝ ±$400-$1,000",
-  "window": "ක්ෂණික තත්පර 60 හෝ පැය 1-4",
+  "expected_move": "නොසැලකිය හැකි (Negligible) හෝ මධ්‍යම ප්‍රමාණයේ චලනයක් හෝ ප්‍රබල චලනයක්",
+  "window": "ක්ෂණික තත්පර 60 හෝ කෙටි කාලීන",
   "bias_badge": "NEUTRAL හෝ BULLISH හෝ BEARISH",
   "news_points": [
-    "පුවතේ ප්‍රධානම සිදුවීම",
-    "අදාළ ප්‍රධාන දත්ත/තොරතුරු",
-    "සිදුවීමේ මූලික පසුබිම"
+    "පුවතේ සිදුවූ දේ පිළිබඳ සරල සිංහල විස්තරය",
+    "අදාළ ප්‍රධාන කරුණු හෝ දත්ත සිංහලෙන්",
+    "පසුබිම පිළිබඳ විස්තරය සිංහලෙන්"
   ],
-  "core_catalyst": "BTC මිලට macro catalyst එකක් වෙනවද නැද්ද යන්න කෙටියෙන්.",
-  "cvd_orderbook_impact": "Spot CVD සහ Perp orderbook එකට වෙන සැබෑ බලපෑම.",
-  "liquidity_traps": "Liquidation traps, fakeout හෝ stop hunt අවදානම.",
+  "core_catalyst": "මෙම පුවත BTC spot/perp මිලට macro catalyst එකක් වෙනවද නැද්ද යන්න සිංහලෙන්ම පමණක් ලියන්න.",
+  "cvd_orderbook_impact": "Spot CVD සහ Perp orderbook එකට වෙන බලපෑම සම්පූර්ණයෙන්ම සිංහලෙන් ලියන්න.",
+  "liquidity_traps": "Liquidation traps, fakeout හෝ stop hunt අවදානම සම්පූර්ණයෙන්ම සිංහලෙන් ලියන්න.",
   "verdict": "නොසලකා හරින්න (IGNORE) හෝ NO-TRADE ZONE හෝ LONG BIAS හෝ SHORT BIAS",
-  "action_plan": "Spot CVD සහ DOM bid/ask absorption මත පදනම් වූ වචන 15-20 ක කෙටිම උපදෙස."
+  "action_plan": "Spot CVD සහ DOM absorption මත පදනම් වූ වචන 15-20 ක කෙටි උපදෙස පිරිසිදු සිංහලෙන්."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -158,9 +163,6 @@ HTML_UI = """<!DOCTYPE html>
             padding: 4px 10px;
             border-radius: 4px;
             letter-spacing: 0.8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
         .badge-archive-recap {
             background: #1e293b;
@@ -421,7 +423,7 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze breaking crypto headline for BTC Orderflow and DOM execution:\n\n{text[:3500]}"
+    prompt_payload = f"Analyze breaking crypto headline for BTC Orderflow and DOM execution. ALL analysis must be exclusively in Sinhala:\n\n{text[:3500]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -430,7 +432,7 @@ async def analyze_news(text):
                 {"role": "user", "content": prompt_payload}
             ],
             response_format={"type": "json_object"},
-            temperature=0.15,
+            temperature=0.1,
             max_tokens=1800
         )
         return json.loads(completion.choices[0].message.content)
@@ -440,19 +442,19 @@ async def analyze_news(text):
             "summarized_english_title": text[:90] + "...",
             "impact_mark": "1.5 / 10 — NOISE",
             "directional_bias": "මධ්‍යස්ථ (Neutral)",
-            "expected_move": "±$0-$50",
+            "expected_move": "නොසැලකිය හැකි (Negligible)",
             "window": "ක්ෂණික තත්පර 60",
             "bias_badge": "NEUTRAL",
             "news_points": [
-                "සාමාන්‍ය වෙළඳපල හෝ දේශපාලන ප්‍රකාශනයකි.",
+                "සාමාන්‍ය පුවතක් හෝ ප්‍රකාශනයක් වාර්තා වී ඇත.",
                 "ක්ෂණික ප්‍රතිපත්ති හෝ අරමුදල් ගලායාමේ වෙනසක් නොමැත.",
-                "Bitcoin මිලට සෘජු බලපෑමක් ඇති නොකරයි."
+                "Bitcoin මිලට සෘජු ආයතනික බලපෑමක් ඇති නොකරයි."
             ],
-            "core_catalyst": "මෙය macro catalyst එකක් නොවන සාමාන්‍ය noise පුවතකි.",
-            "cvd_orderbook_impact": "Spot CVD සහ DOM bid/ask liquidity වල වෙනසක් නැත.",
+            "core_catalyst": "මෙය Bitcoin සඳහා macro catalyst එකක් නොවන සාමාන්‍ය noise පුවතකි.",
+            "cvd_orderbook_impact": "Spot CVD සහ DOM bid/ask liquidity වල කිසිදු කැපී පෙනෙන වෙනසක් නොමැත.",
             "liquidity_traps": "ලික්විඩේෂන් හෝ fake wick අවදානමක් නොමැත.",
             "verdict": "නොසලකා හරින්න (IGNORE)",
-            "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැත. Market orders දැමීමෙන් වළකින්න (No trade)."
+            "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැති බැවින් trade නොගෙන සිටින්න."
         }
 
 async def broadcast(item):
@@ -487,7 +489,7 @@ async def news_worker():
             "is_fresh_breaking": is_fresh,
             "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
             "directional_bias": res.get("directional_bias", "මධ්‍යස්ථ (Neutral)"),
-            "expected_move": res.get("expected_move", "±$0-$50"),
+            "expected_move": res.get("expected_move", "නොසැලකිය හැකි (Negligible)"),
             "window": res.get("window", "ක්ෂණික තත්පර 60"),
             "bias_badge": res.get("bias_badge", "NEUTRAL"),
             "news_points": res.get("news_points", []),
