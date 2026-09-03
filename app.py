@@ -37,7 +37,7 @@ Your job is to conduct an EXHAUSTIVE, DEEP-DIVE FACTUAL BREAKDOWN of the raw inc
 
 LANGUAGE ENFORCEMENT:
 - 'summarized_english_title': Ultra-sharp, precise English headline capturing the exact development (Max 1 sentence).
-- EVERY OTHER FIELD MUST BE WRITTEN IN DEEP, SOPHISTICATED, NATURAL TRADER SINHALA.
+- EVERY OTHER FIELD MUST BE WRITTEN IN DEEP, SOPHISTICATED, NATURAL TRADER SINHALA. Keep it concise, crisp, and direct.
 
 Respond ONLY with a valid JSON object matching this schema:
 {
@@ -48,11 +48,11 @@ Respond ONLY with a valid JSON object matching this schema:
   "window": "ක්ෂණික තත්පර 60 හෝ කෙටි කාලීන",
   "bias_badge": "NEUTRAL හෝ BULLISH හෝ BEARISH",
   "news_points": [
-    "පළවූ පුවතේ මුල සිට අගට ඇති සම්පූර්ණ අන්තර්ගතය සහ කියූ නිශ්චිත කරුණු පිළිබඳ ගැඹුරු සිංහල පැහැදිලි කිරීම",
-    "අදාළ සංවිධානය හෝ පුද්ගලයා කවුද සහ මෙම ප්‍රකාශය පිටුපස ඇති තාක්ෂණික හෝ ව්‍යාපාරික පදනම",
-    "මෙම සමස්ත සිදුවීමෙන් සැබවින්ම කියවෙන වෙළඳපල යථාර්ථය සහ අර්ථය"
+    "පළවූ පුවතේ මුල සිට අගට ඇති සාරාංශගත කරුණු පිළිබඳ ගැඹුරු සිංහල පැහැදිලි කිරීම",
+    "අදාළ සංවිධානය හෝ පුද්ගලයා කවුද සහ මෙම ප්‍රකාශය පිටුපස ඇති සැබෑ තත්ත්වය",
+    "මෙම සිදුවීමෙන් වෙළඳපලට ඇතිවන සැබෑ බලපෑම"
   ],
-  "core_catalyst": "මෙම සිදුවීම BTC සාර්ව ආර්ථික ප්‍රාග්ධන ගලනයට සහ Spot වෙළඳපලට බලපාන්නේ කෙසේද යන්න පිළිබඳ විග්‍රහය.",
+  "core_catalyst": "මෙම සිදුවීම BTC සාර්ව ආර්ථික ප්‍රාග්ධන ගලනයට සහ Spot වෙළඳපලට බලපාන්නේ කෙසේද යන්න පිළිබඳ කෙටි විග්‍රහය.",
   "cvd_orderbook_impact": "Spot CVD වල ආක්‍රමණශීලී මිලදී ගැනීම්/විකිණීම් සහ DOM Orderbook Bid/Ask Limit Walls වල හැසිරීම.",
   "liquidity_traps": "Perp Open Interest වෙනස්වීම්, Short/Long Stop Hunt අවදානම සහ Fakeout/Sweep විය හැකි කලාප.",
   "verdict": "නොසලකා හරින්න (IGNORE) හෝ NO-TRADE ZONE හෝ LONG BIAS හෝ SHORT BIAS",
@@ -85,8 +85,22 @@ HTML_UI = """<!DOCTYPE html>
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        .disclaimer-banner {
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 11.5px;
+            color: #fde047;
+            font-weight: 600;
+            line-height: 1.5;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .nav-brand {
             display: flex;
@@ -411,6 +425,10 @@ HTML_UI = """<!DOCTYPE html>
             </div>
         </div>
 
+        <div class="disclaimer-banner">
+            ⚠️ <strong>Disclaimer:</strong> This is an AI-powered forensic crypto intelligence terminal tracking raw social sentiment & news feeds. Not an official wire news service or financial advice.
+        </div>
+
         <div class="grid" id="news-container">
             <div id="wait-placeholder" style="text-align:center; padding:60px; color:#475569; font-size:14px; font-weight:700;">
                 📡 CONNECTED TO QUANTITATIVE FEED // WAITING FOR CATALYST...
@@ -460,7 +478,7 @@ HTML_UI = """<!DOCTYPE html>
             const card = document.createElement("div");
             card.className = "card";
             
-            // Highlight live incoming news with visual glow
+            // Highlight live incoming news with visual glow & sound
             if (!isInitialLoad) {
                 card.classList.add("new-incoming");
                 playAnyNewsAlert();
@@ -553,10 +571,8 @@ HTML_UI = """<!DOCTYPE html>
                 try {
                     const data = JSON.parse(e.data);
                     if (Array.isArray(data)) { 
-                        // Initial cache load (skip sound)
                         data.forEach(item => addCard(item, true)); 
                     } else { 
-                        // Any new incoming real-time news (plays sound & flashes border)
                         addCard(data, false); 
                     }
                 } catch(err) {}
