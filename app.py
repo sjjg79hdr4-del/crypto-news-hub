@@ -47,7 +47,7 @@ HTML_UI = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA QUANT // PRO MACRO TERMINAL</title>
+    <title>ALPHA QUANT // ආයතනික සාර්ව පර්යන්තය</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -92,6 +92,12 @@ HTML_UI = """<!DOCTYPE html>
             background: #22c55e;
             border-radius: 50%;
             box-shadow: 0 0 8px #22c55e;
+            animation: pulse-dot 1.5s infinite;
+        }
+        @keyframes pulse-dot {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.7; }
         }
         .grid {
             display: flex;
@@ -100,12 +106,51 @@ HTML_UI = """<!DOCTYPE html>
             max-width: 960px;
             margin: 0 auto;
         }
+        .waiting-box {
+            background: #0d121d;
+            border: 1px dashed #1e293b;
+            border-radius: 12px;
+            padding: 60px 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+        .radar-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #1e293b;
+            border-top: 3px solid #38bdf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .waiting-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 0.5px;
+        }
+        .waiting-sub {
+            font-size: 13.5px;
+            color: #94a3b8;
+        }
         .card {
             background: #0d121d;
             border: 1px solid #1b2434;
             border-radius: 12px;
             padding: 22px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .banner-row {
             display: flex;
@@ -195,23 +240,39 @@ HTML_UI = """<!DOCTYPE html>
 <body>
     <div class="header">
         <div class="logo">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div class="live-badge">LIVE STREAMING</div>
+        <div class="live-badge">සජීවී විකාශනය</div>
     </div>
-    <div class="grid" id="news-container"></div>
+    <div class="grid" id="news-container">
+        <div class="waiting-box" id="waiting-placeholder">
+            <div class="radar-spinner"></div>
+            <div class="waiting-title">📡 සජීවී පුවත් සංග්‍රහය ක්‍රියාත්මකයි...</div>
+            <div class="waiting-sub">ක්ෂණික උණුසුම් පුවතක් හෝ සාර්ව ආර්ථික සංඥාවක් ලැබෙන තුරු රැඳී සිටින්න.</div>
+        </div>
+    </div>
     <script>
         const container = document.getElementById("news-container");
+        const placeholder = document.getElementById("waiting-placeholder");
+
+        function removePlaceholder() {
+            if (placeholder && placeholder.parentNode) {
+                placeholder.remove();
+            }
+        }
+
         function addCard(item) {
+            removePlaceholder();
+
             const card = document.createElement("div");
             card.className = "card";
             
             const isBreaking = item.timing_status === "BREAKING";
             const bannerClass = isBreaking ? "banner-BREAKING" : "banner-PRICED_IN";
             const bannerText = isBreaking 
-                ? "⚡ BREAKING ALPHA: ක්ෂණික වෙළඳපල චලනයක් (High Momentum Setup)" 
-                : "⚠️ PRICED-IN / LATE RECAP: වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (Trade එකක් ගන්න එපා - Trap එකක්)";
+                ? "⚡ උණුසුම් පුවතක් (BREAKING ALPHA): ක්ෂණික වෙළඳපල චලනයක් (High Momentum Setup)" 
+                : "⚠️ දැනටමත් සිදුවී අවසන් (PRICED-IN): වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (Trade එකක් ගන්න එපා - Trap එකක්)";
             
             const tier = item.tier || "LOW";
-            const tierLabel = tier === "LOW" ? "● LOW (NOISE)" : (tier === "HIGH" ? "● HIGH (ALPHA)" : "● MEDIUM (WATCH)");
+            const tierLabel = tier === "LOW" ? "● අඩු බලපෑමක් (සාමාන්‍ය පුවතක්)" : (tier === "HIGH" ? "● ප්‍රබල බලපෑමක් (ඉහළ අවධානයක්)" : "● මධ්‍යස්ථ බලපෑමක්");
 
             card.innerHTML = `
                 <div class="banner-row">
@@ -231,13 +292,19 @@ HTML_UI = """<!DOCTYPE html>
             `;
             container.insertBefore(card, container.firstChild);
         }
+
         function connect() {
             const proto = location.protocol === "https:" ? "wss:" : "ws:";
             const ws = new WebSocket(`${proto}//${location.host}/ws`);
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
-                if (Array.isArray(data)) { data.forEach(addCard); }
-                else { addCard(data); }
+                if (Array.isArray(data)) { 
+                    if (data.length > 0) {
+                        data.forEach(addCard); 
+                    }
+                } else { 
+                    addCard(data); 
+                }
             };
             ws.onclose = () => setTimeout(connect, 3000);
         }
