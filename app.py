@@ -37,12 +37,8 @@ Analyze the breaking news/tweet strictly for BITCOIN (BTC) orderflow impact.
 
 LANGUAGE INSTRUCTIONS:
 - 'summarized_english_title' MUST be in concise English (Max 1 sentence).
-- EVERY OTHER FIELD (news_points, core_catalyst, cvd_orderbook_impact, liquidity_traps, verdict, action_plan) MUST BE 100% IN FLUENT, NATURAL SINHALA ONLY.
-- DO NOT OUTPUT ANY ENGLISH IN THE ANALYSIS FIELDS.
-
-CRITICAL RULES:
-- NO fake dollar prices (e.g. no $30k, $80k, etc.).
-- Action Plan must be a SHORT, direct 1-2 sentence tactical recommendation in pure Sinhala (under 20 words).
+- ALL analysis fields MUST be in natural, professional, trader-level Sinhala.
+- DO NOT use awkward Google-translate terms (e.g. NEVER say 'පිටපත් කිරීමේ අවදානම' for replication/exploit, say 'Exploit / Security අවදානම'; NEVER say 'වගකීම් අඩු කිරීම' for de-risking, say 'Risk management / Capital safety'). Use natural trader Sinhala mixed with quant terms.
 
 Respond ONLY with a valid JSON object:
 {
@@ -53,15 +49,15 @@ Respond ONLY with a valid JSON object:
   "window": "ක්ෂණික තත්පර 60 හෝ කෙටි කාලීන",
   "bias_badge": "NEUTRAL හෝ BULLISH හෝ BEARISH",
   "news_points": [
-    "පුවතේ සිදුවූ දේ පිළිබඳ සරල සිංහල විස්තරය",
-    "අදාළ ප්‍රධාන කරුණු හෝ දත්ත සිංහලෙන්",
-    "පසුබිම පිළිබඳ විස්තරය සිංහලෙන්"
+    "පුවතේ ප්‍රධාන සිදුවීම පිළිබඳ පැහැදිලි සාරාංශය",
+    "අදාළ සංඛ්‍යාලේඛන හෝ ප්‍රධාන කරුණු",
+    "සිදුවීම පිටුපස ඇති ආයතනික පසුබිම"
   ],
-  "core_catalyst": "මෙම පුවත BTC spot/perp මිලට macro catalyst එකක් වෙනවද නැද්ද යන්න සිංහලෙන්ම පමණක් ලියන්න.",
-  "cvd_orderbook_impact": "Spot CVD සහ Perp orderbook එකට වෙන බලපෑම සම්පූර්ණයෙන්ම සිංහලෙන් ලියන්න.",
-  "liquidity_traps": "Liquidation traps, fakeout හෝ stop hunt අවදානම සම්පූර්ණයෙන්ම සිංහලෙන් ලියන්න.",
+  "core_catalyst": "මෙම පුවත BTC spot/perp මිලට macro catalyst එකක් වන්නේ කෙසේද යන්න කෙටියෙන් හා පැහැදිලිව.",
+  "cvd_orderbook_impact": "Spot CVD වල sell/buy pressure සහ Perp orderbook එකේ limit liquidity හැසිරීම.",
+  "liquidity_traps": "Stop hunt, fake wick හෝ long/short liquidations සිදුවිය හැකි ආකාරය.",
   "verdict": "නොසලකා හරින්න (IGNORE) හෝ NO-TRADE ZONE හෝ LONG BIAS හෝ SHORT BIAS",
-  "action_plan": "Spot CVD සහ DOM absorption මත පදනම් වූ වචන 15-20 ක කෙටි උපදෙස පිරිසිදු සිංහලෙන්."
+  "action_plan": "Spot CVD divergence සහ orderbook absorption අනුව ගත යුතු කෙටි, පැහැදිලි trading පියවර."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -73,8 +69,8 @@ HTML_UI = """<!DOCTYPE html>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: #070a0f;
-            color: #d1d5db;
+            background: #06090e;
+            color: #cbd5e1;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
             padding: 24px 20px;
         }
@@ -83,7 +79,7 @@ HTML_UI = """<!DOCTYPE html>
             margin: 0 auto;
         }
         .terminal-nav {
-            background: linear-gradient(180deg, #101726 0%, #0c121e 100%);
+            background: linear-gradient(180deg, #0f172a 0%, #090e17 100%);
             border: 1px solid #1e293b;
             border-radius: 12px;
             padding: 14px 20px;
@@ -91,7 +87,7 @@ HTML_UI = """<!DOCTYPE html>
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
         }
         .nav-brand {
             display: flex;
@@ -99,17 +95,17 @@ HTML_UI = """<!DOCTYPE html>
             gap: 12px;
         }
         .brand-icon {
-            width: 34px;
-            height: 34px;
+            width: 36px;
+            height: 36px;
             background: rgba(56, 189, 248, 0.1);
             border: 1px solid rgba(56, 189, 248, 0.3);
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 17px;
+            font-size: 18px;
             color: #38bdf8;
-            box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
         }
         .brand-title {
             font-size: 17px;
@@ -127,7 +123,6 @@ HTML_UI = """<!DOCTYPE html>
             font-weight: 900;
             padding: 2px 7px;
             border-radius: 4px;
-            letter-spacing: 0.5px;
         }
         .brand-sub {
             font-size: 11px;
@@ -138,20 +133,19 @@ HTML_UI = """<!DOCTYPE html>
         .nav-status-group {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
         }
         .live-chip {
             background: rgba(16, 185, 129, 0.1);
             border: 1px solid rgba(16, 185, 129, 0.3);
             color: #34d399;
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 800;
             padding: 5px 12px;
             border-radius: 20px;
             display: flex;
             align-items: center;
             gap: 8px;
-            letter-spacing: 0.5px;
         }
         .live-dot {
             width: 7px;
@@ -181,17 +175,17 @@ HTML_UI = """<!DOCTYPE html>
             gap: 24px;
         }
         .card {
-            background: #0d121d;
-            border: 1px solid #1a2233;
-            border-radius: 10px;
+            background: #0a0f18;
+            border: 1px solid #1a2436;
+            border-radius: 12px;
             padding: 26px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
         }
         .timing-strip {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
         }
         .badge-live-breaking {
             background: #4c0519;
@@ -217,7 +211,7 @@ HTML_UI = """<!DOCTYPE html>
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: #131b2a;
+            background: #0f1726;
             border: 1px solid #1e293b;
             border-radius: 8px;
             padding: 14px 18px;
@@ -229,10 +223,10 @@ HTML_UI = """<!DOCTYPE html>
             gap: 3px;
         }
         .impact-label {
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 800;
             letter-spacing: 1px;
-            color: #94a3b8;
+            color: #64748b;
         }
         .impact-val {
             font-size: 18px;
@@ -245,7 +239,7 @@ HTML_UI = """<!DOCTYPE html>
         .badge-bias {
             padding: 6px 16px;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 900;
             letter-spacing: 1px;
             white-space: nowrap;
@@ -255,34 +249,38 @@ HTML_UI = """<!DOCTYPE html>
         .bias-BEARISH { background: #451319; color: #f87171; border: 1px solid #991b1b; }
 
         .summarized-title {
-            font-size: 17.5px;
+            font-size: 18px;
             font-weight: 800;
             color: #ffffff;
             line-height: 1.5;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
             word-break: break-word;
         }
         .metric-summary {
-            font-size: 14px;
-            line-height: 1.9;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 13.5px;
             color: #94a3b8;
-            border-bottom: 1px solid #1a2333;
-            padding-bottom: 16px;
-            margin-bottom: 18px;
+            background: #0c121e;
+            border: 1px solid #162032;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
         }
         .metric-summary span {
             color: #f1f5f9;
             font-weight: 700;
         }
         .news-summary-box {
-            background: #111a2e;
+            background: #0e1626;
             border-left: 4px solid #38bdf8;
             padding: 16px 18px;
             border-radius: 0 8px 8px 0;
-            margin-bottom: 20px;
+            margin-bottom: 22px;
         }
         .news-summary-title {
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: 900;
             letter-spacing: 1px;
             color: #38bdf8;
@@ -292,7 +290,7 @@ HTML_UI = """<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             gap: 8px;
-            font-size: 14px;
+            font-size: 13.5px;
             line-height: 1.75;
             color: #e2e8f0;
         }
@@ -305,46 +303,83 @@ HTML_UI = """<!DOCTYPE html>
             color: #38bdf8;
             font-weight: 900;
         }
-        .section-header {
-            font-size: 14.5px;
-            font-weight: 800;
-            color: #38bdf8;
-            margin-bottom: 12px;
-        }
-        .points-list {
-            font-size: 14px;
-            line-height: 1.85;
-            color: #94a3b8;
+        
+        /* Structured Analysis Section */
+        .analysis-container {
+            background: #0c121e;
+            border: 1px solid #162032;
+            border-radius: 8px;
+            padding: 18px;
             margin-bottom: 20px;
         }
-        .points-list div {
-            margin-bottom: 10px;
+        .section-header {
+            font-size: 14px;
+            font-weight: 800;
+            color: #38bdf8;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .points-list strong {
-            color: #e2e8f0;
+        .points-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 13.5px;
+            line-height: 1.8;
+            color: #94a3b8;
         }
+        .point-item {
+            background: #080d15;
+            border-left: 2px solid #2563eb;
+            padding: 10px 14px;
+            border-radius: 0 6px 6px 0;
+        }
+        .point-label {
+            color: #f1f5f9;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+
+        /* Verdict Box */
         .verdict-box {
-            background: #131b2a;
+            background: linear-gradient(180deg, #131a29 0%, #0c121e 100%);
             border: 1px solid #1e293b;
             border-radius: 8px;
-            padding: 16px 18px;
-            font-size: 14px;
+            padding: 18px;
+            font-size: 13.5px;
             line-height: 1.8;
+        }
+        .verdict-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
         }
         .verdict-title {
             color: #fbbf24;
-            font-size: 14.5px;
+            font-size: 14px;
             font-weight: 900;
-            margin-bottom: 6px;
+            letter-spacing: 0.5px;
         }
-        .verdict-text {
+        .verdict-badge-box {
+            background: #1e293b;
+            color: #38bdf8;
+            font-weight: 800;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .action-plan-content {
             color: #cbd5e1;
         }
         .card-time {
             text-align: right;
             font-size: 11px;
             color: #475569;
-            margin-top: 12px;
+            margin-top: 14px;
         }
         .bottom-bar {
             margin-top: 28px;
@@ -427,7 +462,8 @@ HTML_UI = """<!DOCTYPE html>
 
                 <div class="metric-summary">
                     <div>🎯 <strong>Directional Bias:</strong> <span>● ${d.directional_bias}</span></div>
-                    <div>⚡ <strong>BTC Expected Move:</strong> <span>${d.expected_move}</span> | <strong>Window:</strong> <span>${d.window}</span></div>
+                    <div>⚡ <strong>BTC Expected Move:</strong> <span>${d.expected_move}</span></div>
+                    <div>⏱️ <strong>Window:</strong> <span>${d.window}</span></div>
                 </div>
 
                 <div class="news-summary-box">
@@ -437,17 +473,27 @@ HTML_UI = """<!DOCTYPE html>
                     </div>
                 </div>
 
-                <div class="section-header">● BTC Orderbook & Price Action බලපෑම:</div>
-                <div class="points-list">
-                    <div>• <strong>Core Catalyst:</strong> ${d.core_catalyst}</div>
-                    <div>• <strong>Orderbook & CVD Impact:</strong> ${d.cvd_orderbook_impact}</div>
-                    <div>• <strong>Liquidity Sweep & Traps:</strong> ${d.liquidity_traps}</div>
+                <div class="analysis-container">
+                    <div class="section-header">● BTC Orderbook & Price Action බලපෑම:</div>
+                    <div class="points-list">
+                        <div class="point-item">
+                            <span class="point-label">• Core Catalyst:</span> ${d.core_catalyst}
+                        </div>
+                        <div class="point-item">
+                            <span class="point-label">• Orderbook & CVD Impact:</span> ${d.cvd_orderbook_impact}
+                        </div>
+                        <div class="point-item">
+                            <span class="point-label">• Liquidity Sweep & Traps:</span> ${d.liquidity_traps}
+                        </div>
+                    </div>
                 </div>
 
                 <div class="verdict-box">
-                    <div class="verdict-title">⚠️ BTC Quant Trade Verdict:</div>
-                    <div class="verdict-text">
-                        <strong>තීන්දුව (Verdict):</strong> ${d.verdict}<br>
+                    <div class="verdict-header">
+                        <div class="verdict-title">⚠️ BTC Quant Trade Verdict</div>
+                        <div class="verdict-badge-box">${d.verdict}</div>
+                    </div>
+                    <div class="action-plan-content">
                         <strong>ක්‍රියාකාරී සැලැස්ම (Action Plan):</strong> ${d.action_plan}
                     </div>
                 </div>
@@ -468,7 +514,7 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze breaking crypto headline for BTC Orderflow and DOM execution. ALL analysis must be exclusively in Sinhala:\n\n{text[:3500]}"
+    prompt_payload = f"Analyze breaking crypto headline for BTC Orderflow and DOM execution. ALL analysis must be exclusively in natural, trader-grade Sinhala:\n\n{text[:3500]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -499,7 +545,7 @@ async def analyze_news(text):
             "cvd_orderbook_impact": "Spot CVD සහ DOM bid/ask liquidity වල කිසිදු කැපී පෙනෙන වෙනසක් නොමැත.",
             "liquidity_traps": "ලික්විඩේෂන් හෝ fake wick අවදානමක් නොමැත.",
             "verdict": "නොසලකා හරින්න (IGNORE)",
-            "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැති බැවින් trade නොගෙන සිටින්න."
+            "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැති බැවින් trade නොගෙන ප්‍රාග්ධනය ආරක්ෂා කරගන්න."
         }
 
 async def broadcast(item):
