@@ -22,9 +22,9 @@ Analyze breaking crypto and macro news (CPI, FOMC, Fed Rates, ETF flows, Hacks, 
 When analyzing Macro data (like CPI, Inflation, Jobs, Interest Rates):
 - If CPI is HIGHER than expected: Explain why this is Bearish (Fed keeps rates high -> DXY up -> liquidity drains from BTC).
 - If CPI is LOWER than expected: Explain why this is Bullish (Rate cut odds up -> DXY down -> liquidity rushes to BTC).
-- Always explain the Fundamental "Why" (ඇයි එහෙම වුණේ කියන හේතුව).
+- Always explain the Fundamental "Why" (ඇයි එහෙම වුණේ කියන ආර්ථික හා මූල්‍යමය හේතුව).
 
-You must start the analysis with EXACTLY this header line so the UI can style the impact badge:
+You must start the analysis with EXACTLY this header line:
 IMPACT_TIER: [HIGH | MEDIUM | LOW]
 
 Then write the rest strictly in clear, natural, fluent SINHALA (සිංහල භාෂාවෙන්) using this format:
@@ -91,7 +91,7 @@ async def broadcast(data_dict):
             dead.add(ws)
     connected_clients.difference_update(dead)
 
-async def handle_incoming_news(full_content, source_name):
+async def handle_incoming_news(full_content, source_name, link_url):
     time_display = datetime.now().strftime("%I:%M:%S %p")
     news_id = f"news_{int(asyncio.get_event_loop().time() * 1000)}"
     
@@ -100,6 +100,7 @@ async def handle_incoming_news(full_content, source_name):
         "id": news_id,
         "content": full_content,
         "source": source_name,
+        "link": link_url,
         "tier": "PENDING",
         "analysis": "⚡ ගැඹුරු Macro, Orderbook සහ 'ඇයි එහෙම වුණේ' හේතුව සකස් වෙමින් පවතී...",
         "time": time_display
@@ -113,6 +114,7 @@ async def handle_incoming_news(full_content, source_name):
         "id": news_id,
         "content": full_content,
         "source": source_name,
+        "link": link_url,
         "tier": tier,
         "analysis": analysis,
         "time": time_display
@@ -135,13 +137,22 @@ async def treeofalpha_stream():
                         if msg.type == WSMsgType.TEXT:
                             try:
                                 data = json.loads(msg.data)
-                                title = data.get("title", "")
-                                body = data.get("body", "")
-                                source = data.get("source", "Crypto Feed")
-                                full_text = f"{title}\n\n{body}".strip() if body else title.strip()
+                                title = (data.get("title") or "").strip()
+                                body = (data.get("body") or "").strip()
+                                source = data.get("source") or "Tree News Wire"
+                                link_url = data.get("link") or data.get("url") or ""
                                 
+                                # Title සහ Body දෙකම එකතු කර සම්පූර්ණ Text එක ගැනීම
+                                full_text = ""
+                                if title and body:
+                                    full_text = f"{title}\n\n{body}"
+                                elif title:
+                                    full_text = title
+                                elif body:
+                                    full_text = body
+                                    
                                 if full_text:
-                                    asyncio.create_task(handle_incoming_news(full_text, source))
+                                    asyncio.create_task(handle_incoming_news(full_text, source, link_url))
                             except Exception as parse_err:
                                 logger.error(f"JSON Parse err: {parse_err}")
                         elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
@@ -191,13 +202,10 @@ HTML_PAGE = """
             background: #0e1420;
             border: 1px solid #1e293b;
             border-radius: 14px;
-            padding: 0;
             margin-bottom: 28px;
             box-shadow: 0 10px 28px rgba(0,0,0,0.6);
             overflow: hidden;
         }
-        
-        /* උඩින්ම එන ලොකු Impact Title Bar එක */
         .impact-title-bar {
             padding: 14px 24px;
             font-size: 19px;
@@ -230,15 +238,13 @@ HTML_PAGE = """
             border-left: 6px solid #38bdf8;
         }
 
-        .card-body {
-            padding: 24px;
-        }
+        .card-body { padding: 24px; }
         .news-content {
             font-size: 20px;
             font-weight: 700;
             color: #ffffff;
-            line-height: 1.6;
-            margin-bottom: 20px;
+            line-height: 1.65;
+            margin-bottom: 22px;
             white-space: pre-wrap;
             word-break: break-word;
         }
@@ -260,7 +266,14 @@ HTML_PAGE = """
             margin-top: 16px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
+        .source-link {
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .source-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -325,6 +338,9 @@ HTML_PAGE = """
             const card = document.createElement('div');
             card.className = 'news-card';
             card.id = data.id || ('temp_' + Math.random());
+            
+            let sourceHtml = data.link ? `<a href="${data.link}" target="_blank" class="source-link">Source: ${data.source || 'Direct Wire'} ↗</a>` : `<span>Source: ${data.source || 'Direct Wire'}</span>`;
+
             card.innerHTML = `
                 <div class="impact-title-bar tier-${tier}" id="header_${data.id}">
                     ${getHeaderHtml(tier)}
@@ -333,7 +349,7 @@ HTML_PAGE = """
                     <div class="news-content">${data.content}</div>
                     <div class="analysis-box" id="box_${data.id}">${data.analysis}</div>
                     <div class="timestamp">
-                        <span>Source: ${data.source || 'Macro Feed'}</span>
+                        ${sourceHtml}
                         <span>${data.time || ''}</span>
                     </div>
                 </div>
