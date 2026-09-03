@@ -148,6 +148,21 @@ HTML_UI = """<!DOCTYPE html>
             align-items: center;
             gap: 12px;
         }
+        .sound-toggle-btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #38bdf8;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sound-toggle-btn:hover {
+            background: #334155;
+            color: #ffffff;
+        }
         .live-chip {
             background: rgba(16, 185, 129, 0.1);
             border: 1px solid rgba(16, 185, 129, 0.3);
@@ -420,6 +435,7 @@ HTML_UI = """<!DOCTYPE html>
                 </div>
             </div>
             <div class="nav-status-group">
+                <button class="sound-toggle-btn" id="sound-btn" onclick="toggleSound()">🔊 SOUND: ENABLED</button>
                 <div class="latency-chip">⚡ 12ms EXECUTION</div>
                 <div class="live-chip" id="status-chip"><div class="live-dot"></div> FEED SYNCHRONIZED</div>
             </div>
@@ -442,18 +458,63 @@ HTML_UI = """<!DOCTYPE html>
     </div>
 
     <script>
-        // Universal Web Audio API Alert for ANY New Incoming News
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById("sound-btn");
+            if (soundEnabled) {
+                btn.innerText = "🔊 SOUND: ENABLED";
+                btn.style.borderColor = "#334155";
+                btn.style.color = "#38bdf8";
+                initAudioContext();
+            } else {
+                btn.innerText = "🔇 SOUND: MUTED";
+                btn.style.borderColor = "#991b1b";
+                btn.style.color = "#f87171";
+            }
+        }
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Auto-unlock audio context on first user interaction anywhere on page
+        ['click', 'keydown', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }, { once: true });
+        });
+
         function playAnyNewsAlert() {
+            if (!soundEnabled) return;
             try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 
                 osc.type = 'triangle';
-                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
-                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2); // Up to A5
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2); // A5
                 
-                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
                 
                 osc.connect(gain);
@@ -478,7 +539,6 @@ HTML_UI = """<!DOCTYPE html>
             const card = document.createElement("div");
             card.className = "card";
             
-            // Highlight live incoming news with visual glow & sound
             if (!isInitialLoad) {
                 card.classList.add("new-incoming");
                 playAnyNewsAlert();
