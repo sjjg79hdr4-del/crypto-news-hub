@@ -37,7 +37,7 @@ Your job is to conduct an EXHAUSTIVE, DEEP-DIVE FACTUAL BREAKDOWN of the raw inc
 
 LANGUAGE ENFORCEMENT:
 - 'summarized_english_title': Ultra-sharp, precise English headline capturing the exact development (Max 1 sentence).
-- EVERY OTHER FIELD MUST BE WRITTEN IN DEEP, SOPHISTICATED, NATURAL TRADER SINHALA. Keep it concise, crisp, and direct.
+- EVERY OTHER FIELD MUST BE WRITTEN IN DEEP, SOPHISTICATED, NATURAL TRADER SINHALA. Keep it concise, crisp, and direct. NEVER leave any field empty.
 
 Respond ONLY with a valid JSON object matching this schema:
 {
@@ -470,7 +470,6 @@ HTML_UI = """<!DOCTYPE html>
 
     <script>
         let soundEnabled = true;
-        // HTML5 Audio element using a short high-pitch alert beep data URI
         const alertAudio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"+Array(200).join("C"));
 
         function toggleSound() {
@@ -487,7 +486,6 @@ HTML_UI = """<!DOCTYPE html>
             }
         }
 
-        // Request browser notification permission so background tabs can notify or alert
         if (window.Notification && Notification.permission !== "granted") {
             Notification.requestPermission();
         }
@@ -495,10 +493,8 @@ HTML_UI = """<!DOCTYPE html>
         function playAnyNewsAlert(titleText) {
             if (!soundEnabled) return;
             try {
-                // Play HTML5 Audio element (works even in background tabs if user interacted once)
                 alertAudio.currentTime = 0;
                 alertAudio.play().catch(e => {
-                    // Fallback Web Audio API synth beep if audio play blocked
                     const ctx = new (window.AudioContext || window.webkitAudioContext)();
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
@@ -512,7 +508,6 @@ HTML_UI = """<!DOCTYPE html>
                     osc.stop(ctx.currentTime + 0.3);
                 });
 
-                // If user is on another tab, show a browser notification if permitted
                 if (document.hidden && Notification.permission === "granted") {
                     new Notification("⚡ New Alpha Quant News!", {
                         body: titleText || "New incoming catalyst detected.",
@@ -589,13 +584,13 @@ HTML_UI = """<!DOCTYPE html>
                     <div class="section-header">● BTC Orderbook & Price Action ගැඹුරු බලපෑම:</div>
                     <div class="points-list">
                         <div class="point-item">
-                            <span class="point-label">• Core Catalyst:</span> ${d.core_catalyst}
+                            <span class="point-label">• Core Catalyst:</span> ${d.core_catalyst || "වෙළඳපලට සෘජු ප්‍රාග්ධන ගලනයක් නොමැත."}
                         </div>
                         <div class="point-item">
-                            <span class="point-label">• Orderbook & CVD Impact:</span> ${d.cvd_orderbook_impact}
+                            <span class="point-label">• Orderbook & CVD Impact:</span> ${d.cvd_orderbook_impact || "CVD වල වෙනසක් නොමැත."}
                         </div>
                         <div class="point-item">
-                            <span class="point-label">• Liquidity Sweep & Traps:</span> ${d.liquidity_traps}
+                            <span class="point-label">• Liquidity Sweep & Traps:</span> ${d.liquidity_traps || "අදාළ අවදානම් නොමැත."}
                         </div>
                     </div>
                 </div>
@@ -749,11 +744,11 @@ async def news_worker():
             "window": res.get("window", "ක්ෂණික තත්පර 60"),
             "bias_badge": res.get("bias_badge", "NEUTRAL"),
             "news_points": res.get("news_points", []),
-            "core_catalyst": res.get("core_catalyst", ""),
-            "cvd_orderbook_impact": res.get("cvd_orderbook_impact", ""),
-            "liquidity_traps": res.get("liquidity_traps", ""),
+            "core_catalyst": res.get("core_catalyst") or "වෙළඳපලට සෘජු ප්‍රාග්ධන ගලනයක් නොමැත.",
+            "cvd_orderbook_impact": res.get("cvd_orderbook_impact") or "CVD වල වෙනසක් නොමැත.",
+            "liquidity_traps": res.get("liquidity_traps") or "අදාළ අවදානම් නොමැත.",
             "verdict": res.get("verdict", "නොසලකා හරින්න (IGNORE)"),
-            "action_plan": res.get("action_plan", ""),
+            "action_plan": res.get("action_plan", "ප්‍රාග්ධනය ආරක්ෂා කරගන්න."),
             "card_time": time.strftime("%H:%M:%S")
         }
         await broadcast(payload)
@@ -796,7 +791,7 @@ async def treeofalpha_stream():
                                 "time": item_time
                             })
         except Exception as e:
-            logger.error(f"Stream reconnecting: {e}")
+            logger.error(f5"Stream reconnecting: {e}")
             await asyncio.sleep(3)
 
 async def index(request): return web.Response(text=HTML_UI, content_type="text/html")
@@ -829,6 +824,7 @@ async def stop_bg(app):
     await asyncio.gather(app["s"], app["w"], return_exceptions=True)
 
 def create_app():
+    app.app = web.Application() if 'web' in globals() else None
     app = web.Application()
     app.router.add_get("/", index)
     app.router.add_get("/ws", websocket_handler)
