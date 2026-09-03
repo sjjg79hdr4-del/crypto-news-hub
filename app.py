@@ -470,7 +470,8 @@ HTML_UI = """<!DOCTYPE html>
 
     <script>
         let soundEnabled = true;
-        let audioCtx = null;
+        // HTML5 Audio element using a short high-pitch alert beep data URI
+        const alertAudio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"+Array(200).join("C"));
 
         function toggleSound() {
             soundEnabled = !soundEnabled;
@@ -479,7 +480,6 @@ HTML_UI = """<!DOCTYPE html>
                 btn.innerText = "🔊 SOUND: ENABLED";
                 btn.style.borderColor = "#334155";
                 btn.style.color = "#38bdf8";
-                initAudioContext();
             } else {
                 btn.innerText = "🔇 SOUND: MUTED";
                 btn.style.borderColor = "#991b1b";
@@ -487,52 +487,39 @@ HTML_UI = """<!DOCTYPE html>
             }
         }
 
-        function initAudioContext() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+        // Request browser notification permission so background tabs can notify or alert
+        if (window.Notification && Notification.permission !== "granted") {
+            Notification.requestPermission();
         }
 
-        ['click', 'keydown', 'touchstart'].forEach(evt => {
-            window.addEventListener(evt, () => {
-                if (!audioCtx) {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
-            }, { once: true });
-        });
-
-        function playAnyNewsAlert() {
+        function playAnyNewsAlert(titleText) {
             if (!soundEnabled) return;
             try {
-                if (!audioCtx) {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
+                // Play HTML5 Audio element (works even in background tabs if user interacted once)
+                alertAudio.currentTime = 0;
+                alertAudio.play().catch(e => {
+                    // Fallback Web Audio API synth beep if audio play blocked
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                });
 
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
-                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2); 
-                
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-                
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.25);
-            } catch(e) {}
+                // If user is on another tab, show a browser notification if permitted
+                if (document.hidden && Notification.permission === "granted") {
+                    new Notification("⚡ New Alpha Quant News!", {
+                        body: titleText || "New incoming catalyst detected.",
+                        icon: "https://cryptologos.cc/logos/bitcoin-btc-logo.svg?v=035"
+                    });
+                }
+            } catch(err) {}
         }
 
         const container = document.getElementById("news-container");
@@ -551,7 +538,7 @@ HTML_UI = """<!DOCTYPE html>
             
             if (!isInitialLoad) {
                 card.classList.add("new-incoming");
-                playAnyNewsAlert();
+                playAnyNewsAlert(d.display_title);
             }
 
             const rawBias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
@@ -640,7 +627,6 @@ HTML_UI = """<!DOCTYPE html>
                 if (e.data === "pong") return;
                 try {
                     const msg = JSON.parse(e.data);
-                    // Check if it's an online count update broadcast
                     if (msg.type === "online_count") {
                         document.getElementById("online-count-chip").innerText = `👤 ONLINE: ${msg.count}`;
                         return;
