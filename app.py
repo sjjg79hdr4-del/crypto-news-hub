@@ -50,7 +50,11 @@ async def analyze_news(full_text):
     if not client:
         return "LOW", "⚠️ GROQ_API_KEY සකසා නැත."
     try:
-        completion = await client.chat.completions.create(
+        global key_idx
+            if not clients:
+                return "BREAKING", "LOW", "⚠️ API Keys සකසා නැත."
+            current_client = clients[key_idx % len(clients)]
+            completion = await current_client.chat.completions.create(
             model="qwen/qwen3.8-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
