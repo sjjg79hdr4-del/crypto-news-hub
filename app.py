@@ -33,7 +33,11 @@ def generate_text_hash(text):
     return hashlib.md5(clean.encode()).hexdigest()
 
 SYSTEM_PROMPT = """You are an elite cryptocurrency market microstructure intelligence terminal and forensic on-chain quant.
-Your job is to conduct an EXHAUSTIVE, DEEP-DIVE FACTUAL BREAKDOWN of the raw incoming news or tweet from beginning to end.
+Your job is to conduct an EXHAUSTIVE, DEEP-DIVE FACTUAL BREAKDOWN of the raw incoming news or tweet.
+
+CRITICAL RULE FOR IMPACT EVALUATION:
+- Newspapers, media opinion pieces (e.g., WSJ, Bloomberg articles), historical analysis, or general commentary are NOT breaking market catalysts. They must ALWAYS be given a low impact mark (e.g., 2.0 / 10 to 4.5 / 10) and classified as NOISE or standard macro feed.
+- ONLY live breaking regulatory actions (SEC, CFTC), sudden exchange hacks, emergency central bank rate cuts, or massive on-chain liquidations deserve high impact marks (>= 7.5 / 10).
 
 LANGUAGE ENFORCEMENT:
 - 'summarized_english_title': Ultra-sharp, precise English headline capturing the exact development (Max 1 sentence).
@@ -676,7 +680,7 @@ RAW SOURCE CONTENT:
                 {"role": "user", "content": prompt_payload}
             ],
             response_format={"type": "json_object"},
-            temperature=0.15,
+            temperature=0.1,
             max_tokens=2200
         )
         return json.loads(completion.choices[0].message.content)
@@ -743,7 +747,8 @@ async def news_worker():
         except:
             pass
 
-        is_high_impact = is_fresh and (impact_num >= 7.0)
+        # Strict threshold: Only true fresh breaking news with >= 7.5 score get high impact badge
+        is_high_impact = is_fresh and (impact_num >= 7.5)
         display_title = res.get("summarized_english_title") or full_title
         
         payload = {
