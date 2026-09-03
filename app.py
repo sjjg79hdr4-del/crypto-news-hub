@@ -784,7 +784,7 @@ async def treeofalpha_stream():
                             if len(combined) < 15:
                                 continue
                             
-4                            h = generate_text_hash(combined)
+                            h = generate_text_hash(combined)
                             if h in seen_hashes:
                                 continue
                             seen_hashes.add(h)
