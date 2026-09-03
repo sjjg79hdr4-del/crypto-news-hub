@@ -9,7 +9,7 @@ from aiohttp import web
 from openai import AsyncOpenAI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("CryptoNewsHub")
+logger = logging.getLogger("MacroTerminal")
 
 _k = b'Z3NrX1RMTmdlSEl4VVJWSjh5eU81Rm5CV0dkeWIzRllzV1hIYnBiYnY4cEdGdUw3V2JiZVB2T04='
 API_KEY = os.environ.get("GROQ_API_KEY") or base64.b64decode(_k).decode()
@@ -26,64 +26,208 @@ recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are a senior institutional quantitative crypto analyst.
-Analyze the given breaking crypto/financial news strictly in fluent, natural Sinhala.
-Do NOT output English reasoning or <think> tags. Answer directly and concisely.
+SYSTEM_PROMPT = """You are an institutional quantitative crypto macro analyst running a tier-1 trading terminal.
+Analyze the given breaking crypto/financial news strictly in fluent, natural Sinhala. Never mention any AI model or provider name.
 
-Respond EXACTLY in this format:
-TIMING_STATUS: [BREAKING or PRICED_IN]
-IMPACT_TIER: [HIGH, MEDIUM, or LOW]
+Respond strictly in this exact format:
+TIMING_BANNER: [BREAKING or PRICED_IN]
+IMPACT_TIER: [HIGH or MEDIUM or LOW]
+IMPACT_SCORE: [Number between 1 and 10]/10
+MARKET_BIAS: [BULLISH or BEARISH or NEUTRAL]
+EXPECTED_MOVE: [e.g. ±$200 - $500 or ±$0 - $0]
+TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත or ඉදිරි දින කිහිපය]
 
-**ක්ෂණික වෙළඳපල බලපෑම:**
-(පැහැදිලි සිංහලෙන් කෙටි විග්‍රහයක්)
-
-**ප්‍රධාන ප්‍රතිලාභීන් / අලාභ ලබන්නන්:**
-(බලපෑමට ලක්වන Cryptos / Tokens)
-
-**Microstructure & Market Horizon:**
-(කෙටි කාලීන සහ දිගු කාලීන බලපෑම)"""
+ANALYSIS_BODY:
+• සෘජු බලපෑම (Direct Impact): [කෙටි පැහැදිලි කිරීමක්]
+• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [ආර්ථික හෝ වෙළඳපල පසුබිම]
+• කාලීන අවදානම (Timing & Late-Chasing Trap): [ප්‍රමාද වී trade කිරීමේ අවදානම හෝ signal එක]"""
 
 HTML_UI = """<!DOCTYPE html>
 <html lang="si">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ALPHA QUANT // PRO MACRO TERMINAL</title>
     <style>
-        body { background: #0b0e14; color: #d1d5db; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; padding-bottom: 15px; margin-bottom: 20px; }
-        .title { font-size: 20px; font-weight: bold; color: #10b981; letter-spacing: 1px; }
-        .grid { display: flex; flex-direction: column; gap: 15px; max-width: 900px; margin: 0 auto; }
-        .card { background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 8px; }
-        .status-BREAKING { background: #ef4444; color: #fff; }
-        .status-PRICED_IN { background: #6b7280; color: #fff; }
-        .tier-HIGH { border-left: 4px solid #ef4444; }
-        .tier-MEDIUM { border-left: 4px solid #f59e0b; }
-        .tier-LOW { border-left: 4px solid #10b981; }
-        .source { font-size: 12px; color: #9ca3af; margin-bottom: 6px; }
-        .news-title { font-size: 16px; font-weight: bold; color: #f9fafb; margin-bottom: 12px; line-height: 1.4; }
-        .analysis { background: #161f30; border-radius: 6px; padding: 12px; font-size: 14px; line-height: 1.6; color: #e5e7eb; white-space: pre-wrap; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #080b11;
+            color: #d1d5db;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 24px;
+        }
+        .header {
+            max-width: 960px;
+            margin: 0 auto 24px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 19px;
+            font-weight: 800;
+            color: #38bdf8;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .live-badge {
+            background: #052e16;
+            border: 1px solid #15803d;
+            color: #4ade80;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 9999px;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .live-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #22c55e;
+        }
+        .grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #0d121d;
+            border: 1px solid #1b2434;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .banner-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .banner-box {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+        .banner-BREAKING {
+            background: #3f1219;
+            color: #fca5a5;
+            border: 1px solid #7f1d1d;
+        }
+        .banner-PRICED_IN {
+            background: #2a1f0a;
+            color: #fde047;
+            border: 1px solid #78350f;
+        }
+        .tier-pill {
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .tier-LOW { background: #13241b; color: #4ade80; border: 1px solid #1e3a29; }
+        .tier-MEDIUM { background: #261f0e; color: #fbbf24; border: 1px solid #453313; }
+        .tier-HIGH { background: #2d1217; color: #f87171; border: 1px solid #4c1d24; }
+        .news-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 18px;
+            line-height: 1.45;
+        }
+        .divider {
+            height: 1px;
+            background: #1e293b;
+            margin-bottom: 18px;
+        }
+        .metrics-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13.5px;
+            color: #e2e8f0;
+            margin-bottom: 18px;
+        }
+        .metric-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .metric-label {
+            color: #94a3b8;
+        }
+        .metric-val {
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .section-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #cbd5e1;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .analysis-text {
+            font-size: 13.5px;
+            line-height: 1.8;
+            color: #94a3b8;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="title">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Qwen 3.6 Pro)</div>
+        <div class="logo">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
+        <div class="live-badge">LIVE STREAMING</div>
     </div>
     <div class="grid" id="news-container"></div>
     <script>
         const container = document.getElementById("news-container");
-        function addCard(data) {
+        function addCard(item) {
             const card = document.createElement("div");
-            card.className = "card tier-" + (data.tier || "LOW");
+            card.className = "card";
+            
+            const isBreaking = item.timing_status === "BREAKING";
+            const bannerClass = isBreaking ? "banner-BREAKING" : "banner-PRICED_IN";
+            const bannerText = isBreaking 
+                ? "⚡ BREAKING ALPHA: ක්ෂණික වෙළඳපල චලනයක් (High Momentum Setup)" 
+                : "⚠️ PRICED-IN / LATE RECAP: වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (Trade එකක් ගන්න එපා - Trap එකක්)";
+            
+            const tier = item.tier || "LOW";
+            const tierLabel = tier === "LOW" ? "● LOW (NOISE)" : (tier === "HIGH" ? "● HIGH (ALPHA)" : "● MEDIUM (WATCH)");
+
             card.innerHTML = `
-                <div>
-                    <span class="badge status-${data.status || 'BREAKING'}">${data.status || 'BREAKING'}</span>
-                    <span class="badge" style="background:#374151;">IMPACT: ${data.tier || 'LOW'}</span>
+                <div class="banner-row">
+                    <div class="banner-box ${bannerClass}">${bannerText}</div>
+                    <div class="tier-pill tier-${tier}">${tierLabel}</div>
                 </div>
-                <div class="source">${data.source || 'Tree of Alpha'} • ${new Date(data.time).toLocaleTimeString()}</div>
-                <div class="news-title">${data.title}</div>
-                <div class="analysis">${data.analysis}</div>
+                <div class="news-title">${item.title}</div>
+                <div class="divider"></div>
+                <div class="metrics-grid">
+                    <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score || "2/10"}</span></div>
+                    <div class="metric-row"><span class="metric-label">📊 වෙළඳපල දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias || "NEUTRAL"}</span></div>
+                    <div class="metric-row"><span class="metric-label">⚡ අපේක්ෂිත BTC චලනය (Expected Move) :</span> <span class="metric-val">${item.expected_move || "±$0 - $0"}</span></div>
+                    <div class="metric-row"><span class="metric-label">⏱️ ක්‍රියාකාරී කාලය (Time Horizon) :</span> <span class="metric-val">${item.horizon || "දැනටමත් සිදුවී ඇත"}</span></div>
+                </div>
+                <div class="section-title">📊 1. ගැඹුරු වෙළඳපල හා Orderbook විශ්ලේෂණය (Deep Microstructure & Macro):</div>
+                <div class="analysis-text">${item.analysis}</div>
             `;
             container.insertBefore(card, container.firstChild);
         }
@@ -108,30 +252,51 @@ async def analyze_news(full_text):
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Crypto News:\n{full_text[:400]}"}
+                {"role": "user", "content": f"News Headline/Text:\n{full_text[:450]}"}
             ],
-            temperature=0.3,
+            temperature=0.25,
             max_tokens=1500
         )
         raw = completion.choices[0].message.content
-        
-        # Clean any internal reasoning tags if present
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
         
-        status, tier = "BREAKING", "LOW"
-        lines, remaining = raw.splitlines(), []
-        for line in lines:
-            if "TIMING_STATUS:" in line:
-                status = "PRICED_IN" if "PRICED" in line.upper() else "BREAKING"
-            elif "IMPACT_TIER:" in line:
-                t = line.upper()
+        timing = "PRICED_IN"
+        tier = "LOW"
+        score = "2/10"
+        bias = "NEUTRAL"
+        move = "±$0 - $0"
+        horizon = "දැනටමත් සිදුවී ඇත"
+        analysis_body = []
+        
+        in_body = False
+        for line in raw.splitlines():
+            line_str = line.strip()
+            if "TIMING_BANNER:" in line_str:
+                timing = "BREAKING" if "BREAKING" in line_str.upper() else "PRICED_IN"
+            elif "IMPACT_TIER:" in line_str:
+                t = line_str.upper()
                 tier = "HIGH" if "HIGH" in t else ("MEDIUM" if "MEDIUM" in t else "LOW")
-            else:
-                remaining.append(line)
-        return status, tier, "\n".join(remaining).strip()
+            elif "IMPACT_SCORE:" in line_str:
+                score = line_str.split(":", 1)[1].strip()
+            elif "MARKET_BIAS:" in line_str:
+                bias = line_str.split(":", 1)[1].strip()
+            elif "EXPECTED_MOVE:" in line_str:
+                move = line_str.split(":", 1)[1].strip()
+            elif "TIME_HORIZON:" in line_str:
+                horizon = line_str.split(":", 1)[1].strip()
+            elif "ANALYSIS_BODY:" in line_str:
+                in_body = True
+            elif in_body:
+                analysis_body.append(line)
+                
+        body_text = "\n".join(analysis_body).strip()
+        if not body_text:
+            body_text = "• සෘජු බලපෑම (Direct Impact): සෘජු වෙළඳපල බලපෑමක් නොමැත.\n• ඇයි මෙහෙම වුණේ? (The Fundamental \"Why\"): සාමාන්‍ය ප්‍රකාශයක් පමණි.\n• කාලීන අවදානම (Timing & Late-Chasing Trap): වෙළඳපලට ක්ෂණික අවදානමක් නොමැත."
+            
+        return timing, tier, score, bias, move, horizon, body_text
     except Exception as e:
-        logger.error(f"Groq API Error: {e}")
-        return "BREAKING", "LOW", f"⚠️ විශ්ලේෂණ දෝෂයකි: {e}"
+        logger.error(f"Analysis error: {e}")
+        return "PRICED_IN", "LOW", "1/10", "NEUTRAL", "±$0", "දැනටමත් සිදුවී ඇත", f"• විශ්ලේෂණ දෝෂයකි: {e}"
 
 async def broadcast(item):
     recent_news_cache.append(item)
@@ -147,13 +312,16 @@ async def news_worker():
     while True:
         raw_news = await news_queue.get()
         title = raw_news.get("title")
-        status, tier, analysis = await analyze_news(title)
+        timing, tier, score, bias, move, horizon, analysis = await analyze_news(title)
         payload = {
             "title": title,
-            "source": raw_news.get("source", "CryptoStream"),
             "time": raw_news.get("time", 0),
-            "status": status,
+            "timing_status": timing,
             "tier": tier,
+            "score": score,
+            "bias": bias,
+            "expected_move": move,
+            "horizon": horizon,
             "analysis": analysis
         }
         await broadcast(payload)
@@ -179,7 +347,6 @@ async def treeofalpha_stream():
                             
                             await news_queue.put({
                                 "title": title,
-                                "source": raw.get("source", "Tree of Alpha"),
                                 "time": raw.get("time", 0)
                             })
         except Exception as e:
