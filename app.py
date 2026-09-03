@@ -26,22 +26,21 @@ recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are an institutional macro quantitative analyst and crypto trader.
-Analyze the provided full news headline, full tweet/article text, and source strictly in fluent, natural, institutional Sinhala.
-Read the ACTUAL content of the tweet/news carefully. Do NOT give generic robotic answers. Explain specifically based on what is actually stated in the text.
+SYSTEM_PROMPT = """You are an institutional crypto analyst.
+Analyze the provided tweet/news headline strictly in fluent, natural Sinhala.
+Read the ACTUAL news content carefully. Never return generic placeholders.
 
-Strictly format your response as:
-TIMING_BANNER: [BREAKING or PRICED_IN]
-IMPACT_TIER: [HIGH or MEDIUM or LOW]
-IMPACT_SCORE: [Number 1-10]/10
-MARKET_BIAS: [BULLISH or BEARISH or NEUTRAL]
-EXPECTED_MOVE: [e.g. ±$300 - $800 or ±$0 - $50]
-TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් අවසන් or ඉදිරි දින කිහිපය]
+Respond strictly in this format:
+STATUS: [BREAKING or PRICED_IN]
+TIER: [HIGH or MEDIUM or LOW]
+SCORE: [1-10]/10
+BIAS: [BULLISH or BEARISH or NEUTRAL]
+MOVE: [e.g. ±$300 - $800 or ±$0 - $50]
+HORIZON: [e.g. ඉදිරි පැය කිහිපය තුළ or දැනටමත් අවසන්]
 
-ANALYSIS_BODY:
-• සෘජු බලපෑම (Direct Impact): [මෙම tweet/news එකේ සඳහන් කරුණු කෙළින්ම crypto/BTC වෙළඳපලට බලපාන්නේ කෙසේදැයි විස්තර කරන්න]
-• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [මූලාශ්‍රය (Source) සහ tweet එකේ කියන සිදුවීම පිටුපස ඇති සැබෑ ආර්ථික, නීතිමය හෝ දේශපාලන පසුබිම]
-• කාලීන අවදානම (Timing & Late-Chasing Trap): [වෙළඳපල දැනටමත් මේකට react කරලා ඉවරද, නැත්නම් අලුතින් trap එකක් හැදෙනවද යන්න]"""
+• සෘජු බලපෑම (Direct Impact): [Tweet එකේ කියන දේ වෙළඳපලට බලපාන හැටි]
+• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [සිදුවීම පිටුපස ඇති සැබෑ ආර්ථික හෝ නීතිමය හේතුව]
+• කාලීන අවදානම (Timing & Late-Chasing Trap): [දැන් trade එකක් ගත්තොත් trap වෙයිද නැද්ද යන්න]"""
 
 HTML_UI = """<!DOCTYPE html>
 <html lang="si">
@@ -69,9 +68,6 @@ HTML_UI = """<!DOCTYPE html>
             font-weight: 800;
             color: #38bdf8;
             letter-spacing: 1.2px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
         .live-badge {
             background: #064e3b;
@@ -80,7 +76,6 @@ HTML_UI = """<!DOCTYPE html>
             font-weight: 700;
             padding: 5px 14px;
             border-radius: 9999px;
-            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -92,11 +87,6 @@ HTML_UI = """<!DOCTYPE html>
             background: #10b981;
             border-radius: 50%;
             box-shadow: 0 0 6px #10b981;
-            animation: pulse-dot 1.5s infinite;
-        }
-        @keyframes pulse-dot {
-            0%, 100% { transform: scale(0.9); opacity: 0.7; }
-            50% { transform: scale(1.3); opacity: 1; }
         }
         .grid {
             display: flex;
@@ -105,50 +95,12 @@ HTML_UI = """<!DOCTYPE html>
             max-width: 900px;
             margin: 0 auto;
         }
-        .waiting-box {
-            background: #0e1422;
-            border: 1px dashed #1e293b;
-            border-radius: 8px;
-            padding: 60px 20px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-        }
-        .radar-spinner {
-            width: 44px;
-            height: 44px;
-            border: 3px solid #1e293b;
-            border-top: 3px solid #38bdf8;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .waiting-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #f1f5f9;
-        }
-        .waiting-sub {
-            font-size: 13.5px;
-            color: #94a3b8;
-        }
         .card {
             background: #0e1422;
             border: 1px solid #1a2233;
             border-radius: 8px;
             padding: 24px;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-            animation: fadeIn 0.35s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-6px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         .banner-row {
             display: flex;
@@ -163,18 +115,9 @@ HTML_UI = """<!DOCTYPE html>
             border-radius: 4px;
             font-size: 13px;
             font-weight: 700;
-            line-height: 1.4;
         }
-        .banner-BREAKING {
-            background: #3f1219;
-            color: #fca5a5;
-            border: 1px solid #7f1d1d;
-        }
-        .banner-PRICED_IN {
-            background: #251c09;
-            color: #fef08a;
-            border: 1px solid #78350f;
-        }
+        .banner-BREAKING { background: #3f1219; color: #fca5a5; border: 1px solid #7f1d1d; }
+        .banner-PRICED_IN { background: #251c09; color: #fef08a; border: 1px solid #78350f; }
         .tier-pill {
             padding: 6px 14px;
             border-radius: 4px;
@@ -185,74 +128,30 @@ HTML_UI = """<!DOCTYPE html>
         .tier-LOW { background: #0f2318; color: #4ade80; border: 1px solid #14532d; }
         .tier-MEDIUM { background: #261f0e; color: #fbbf24; border: 1px solid #78350f; }
         .tier-HIGH { background: #2d1217; color: #f87171; border: 1px solid #7f1d1d; }
-        
-        .source-tag {
-            font-size: 12px;
-            color: #38bdf8;
-            font-weight: 700;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .news-title {
-            font-size: 17px;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 14px;
-            line-height: 1.5;
-        }
-        .tweet-body-box {
+        .source-tag { font-size: 12px; color: #38bdf8; font-weight: 700; margin-bottom: 6px; }
+        .news-title { font-size: 17px; font-weight: 700; color: #ffffff; margin-bottom: 14px; line-height: 1.5; }
+        .tweet-box {
             background: #090d16;
             border-left: 3px solid #38bdf8;
             padding: 12px 14px;
             font-size: 13px;
-            color: #cbd5e1;
-            line-height: 1.5;
+            color: #94a3b8;
             margin-bottom: 18px;
-            border-radius: 0 4px 4px 0;
             white-space: pre-wrap;
         }
-        .divider {
-            height: 1px;
-            background: #1e293b;
-            margin-bottom: 20px;
-        }
+        .divider { height: 1px; background: #1e293b; margin-bottom: 18px; }
         .metrics-grid {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             font-size: 13.5px;
-            color: #e2e8f0;
-            margin-bottom: 22px;
+            margin-bottom: 20px;
         }
-        .metric-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .metric-label {
-            color: #94a3b8;
-        }
-        .metric-val {
-            font-weight: 700;
-            color: #ffffff;
-            margin-left: 4px;
-        }
-        .section-title {
-            font-size: 13.5px;
-            font-weight: 700;
-            color: #cbd5e1;
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .analysis-text {
-            font-size: 13.5px;
-            line-height: 1.85;
-            color: #94a3b8;
-            white-space: pre-wrap;
-        }
+        .metric-row { display: flex; align-items: center; gap: 6px; }
+        .metric-label { color: #94a3b8; }
+        .metric-val { font-weight: 700; color: #ffffff; }
+        .section-title { font-size: 13.5px; font-weight: 700; color: #cbd5e1; margin-bottom: 12px; }
+        .analysis-text { font-size: 14px; line-height: 1.85; color: #cbd5e1; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -261,55 +160,43 @@ HTML_UI = """<!DOCTYPE html>
         <div class="live-badge">● LIVE STREAMING</div>
     </div>
     <div class="grid" id="news-container">
-        <div class="waiting-box" id="waiting-placeholder">
-            <div class="radar-spinner"></div>
-            <div class="waiting-title">📡 සජීවී පුවත් සංග්‍රහය ක්‍රියාත්මකයි...</div>
-            <div class="waiting-sub">ක්ෂණික උණුසුම් පුවතක් හෝ සාර්ව ආර්ථික සංඥාවක් ලැබෙන තුරු රැඳී සිටින්න.</div>
+        <div id="loading-state" style="text-align:center; padding: 60px 20px; color:#64748b;">
+            📡 සජීවී පුවත් සංග්‍රහයට සම්බන්ධ වී ඇත. අලුත් පුවතක් පැමිණි විගස විශ්ලේෂණය මෙහි දිස්වනු ඇත...
         </div>
     </div>
     <script>
         const container = document.getElementById("news-container");
-        const placeholder = document.getElementById("waiting-placeholder");
-
-        function removePlaceholder() {
-            if (placeholder && placeholder.parentNode) {
-                placeholder.remove();
-            }
-        }
-
         function addCard(item) {
-            removePlaceholder();
+            const loader = document.getElementById("loading-state");
+            if (loader) loader.remove();
 
             const card = document.createElement("div");
             card.className = "card";
-            
-            const isBreaking = item.timing_status === "BREAKING";
+            const isBreaking = item.status === "BREAKING";
             const bannerClass = isBreaking ? "banner-BREAKING" : "banner-PRICED_IN";
             const bannerText = isBreaking 
                 ? "⚡ BREAKING ALPHA: ක්ෂණික වෙළඳපල චලනයක් (High Momentum Setup)" 
                 : "⚠️ PRICED-IN / LATE RECAP: වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (Trade එකක් ගන්න එපා - Trap එකක්)";
-            
+
             const tier = item.tier || "LOW";
             const tierLabel = tier === "LOW" ? "● LOW (NOISE)" : (tier === "HIGH" ? "● HIGH (ALPHA)" : "● MEDIUM (WATCH)");
 
-            const tweetHtml = (item.raw_body && item.raw_body !== item.title) 
-                ? `<div class="tweet-body-box">💬 ${item.raw_body}</div>` 
-                : "";
+            const tweetBox = item.raw_body ? `<div class="tweet-box">💬 ${item.raw_body}</div>` : '';
 
             card.innerHTML = `
                 <div class="banner-row">
                     <div class="banner-box ${bannerClass}">${bannerText}</div>
                     <div class="tier-pill tier-${tier}">${tierLabel}</div>
                 </div>
-                <div class="source-tag">📌 SOURCE: ${item.source || "Tree News"}</div>
+                <div class="source-tag">📌 SOURCE: ${item.source}</div>
                 <div class="news-title">${item.title}</div>
-                ${tweetHtml}
+                ${tweetBox}
                 <div class="divider"></div>
                 <div class="metrics-grid">
-                    <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score || "2 / 10"}</span></div>
-                    <div class="metric-row"><span class="metric-label">📊 වෙළඳපල දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias || "NEUTRAL"}</span></div>
-                    <div class="metric-row"><span class="metric-label">⚡ අපේක්ෂිත BTC චලනය (Expected Move) :</span> <span class="metric-val">${item.expected_move || "±$0 - $0"}</span></div>
-                    <div class="metric-row"><span class="metric-label">⏱️ ක්‍රියාකාරී කාලය (Time Horizon) :</span> <span class="metric-val">${item.horizon || "දැනටමත් සිදුවී ඇත"}</span></div>
+                    <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score}</span></div>
+                    <div class="metric-row"><span class="metric-label">📊 වෙළඳපල දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias}</span></div>
+                    <div class="metric-row"><span class="metric-label">⚡ අපේක්ෂිත BTC චලනය (Expected Move) :</span> <span class="metric-val">${item.move}</span></div>
+                    <div class="metric-row"><span class="metric-label">⏱️ ක්‍රියාකාරී කාලය (Time Horizon) :</span> <span class="metric-val">${item.horizon}</span></div>
                 </div>
                 <div class="section-title">📊 1. ගැඹුරු වෙළඳපල හා Orderbook විශ්ලේෂණය (Deep Microstructure & Macro):</div>
                 <div class="analysis-text">${item.analysis}</div>
@@ -317,34 +204,25 @@ HTML_UI = """<!DOCTYPE html>
             container.insertBefore(card, container.firstChild);
         }
 
-        function connect() {
-            const proto = location.protocol === "https:" ? "wss:" : "ws:";
-            const ws = new WebSocket(`${proto}//${location.host}/ws`);
-            ws.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-                if (Array.isArray(data)) { 
-                    if (data.length > 0) {
-                        data.forEach(addCard); 
-                    }
-                } else { 
-                    addCard(data); 
-                }
-            };
-            ws.onclose = () => setTimeout(connect, 3000);
-        }
-        connect();
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (Array.isArray(data)) { data.forEach(addCard); }
+            else { addCard(data); }
+        };
     </script>
 </body>
 </html>"""
 
 async def analyze_news(title, body, source):
     try:
-        combined_content = f"Source: {source}\nHeadline: {title}\nFull Text/Tweet: {body}"
+        content = f"Source: {source}\nHeadline: {title}\nFull Text: {body}"
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Analyze this specific breaking news deeply:\n{combined_content[:1500]}"}
+                {"role": "user", "content": f"Analyze this specific news:\n{content[:1200]}"}
             ],
             temperature=0.2,
             max_tokens=1500
@@ -352,75 +230,61 @@ async def analyze_news(title, body, source):
         raw = completion.choices[0].message.content
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
         
-        timing = "PRICED_IN"
+        status = "PRICED_IN"
         tier = "LOW"
         score = "2 / 10"
         bias = "NEUTRAL"
         move = "±$0 - $0"
         horizon = "දැනටමත් සිදුවී ඇත"
-        analysis_body = []
-        
-        in_body = False
+        body_lines = []
+
         for line in raw.splitlines():
-            line_str = line.strip()
-            if "TIMING_BANNER:" in line_str:
-                timing = "BREAKING" if "BREAKING" in line_str.upper() else "PRICED_IN"
-            elif "IMPACT_TIER:" in line_str:
-                t = line_str.upper()
-                tier = "HIGH" if "HIGH" in t else ("MEDIUM" if "MEDIUM" in t else "LOW")
-            elif "IMPACT_SCORE:" in line_str:
-                score = line_str.split(":", 1)[1].strip()
-            elif "MARKET_BIAS:" in line_str:
-                bias = line_str.split(":", 1)[1].strip()
-            elif "EXPECTED_MOVE:" in line_str:
-                move = line_str.split(":", 1)[1].strip()
-            elif "TIME_HORIZON:" in line_str:
-                horizon = line_str.split(":", 1)[1].strip()
-            elif "ANALYSIS_BODY:" in line_str:
-                in_body = True
-            elif in_body:
-                analysis_body.append(line)
-                
-        body_text = "\n".join(analysis_body).strip()
-        return timing, tier, score, bias, move, horizon, body_text
+            s = line.strip()
+            if s.startswith("STATUS:"): status = "BREAKING" if "BREAKING" in s else "PRICED_IN"
+            elif s.startswith("TIER:"): tier = "HIGH" if "HIGH" in s else ("MEDIUM" if "MEDIUM" in s else "LOW")
+            elif s.startswith("SCORE:"): score = s.replace("SCORE:", "").strip()
+            elif s.startswith("BIAS:"): bias = s.replace("BIAS:", "").strip()
+            elif s.startswith("MOVE:"): move = s.replace("MOVE:", "").strip()
+            elif s.startswith("HORIZON:"): horizon = s.replace("HORIZON:", "").strip()
+            else:
+                if s: body_lines.append(s)
+
+        actual_analysis = "\n".join(body_lines).strip()
+        return status, tier, score, bias, move, horizon, actual_analysis
     except Exception as e:
-        logger.error(f"Analysis error: {e}")
-        return "PRICED_IN", "LOW", "1 / 10", "NEUTRAL", "±$0 - $0", "දැනටමත් සිදුවී ඇත", f"• විශ්ලේෂණ දෝෂයකි: {e}"
+        logger.error(f"Error: {e}")
+        return "PRICED_IN", "LOW", "1/10", "NEUTRAL", "±$0", "දැනටමත් සිදුවී ඇත", f"විශ්ලේෂණ දෝෂයකි: {e}"
 
 async def broadcast(item):
     recent_news_cache.append(item)
-    if len(recent_news_cache) > 30:
-        recent_news_cache.pop(0)
+    if len(recent_news_cache) > 30: recent_news_cache.pop(0)
     for ws in list(connected_websockets):
-        try:
-            await ws.send_str(json.dumps(item))
-        except Exception:
-            connected_websockets.discard(ws)
+        try: await ws.send_str(json.dumps(item))
+        except: connected_websockets.discard(ws)
 
 async def news_worker():
     while True:
         raw_news = await news_queue.get()
         title = raw_news.get("title", "")
         body = raw_news.get("body", "")
-        source = raw_news.get("source", "Tree of Alpha")
+        source = raw_news.get("source", "Tree News")
         
-        timing, tier, score, bias, move, horizon, analysis = await analyze_news(title, body, source)
+        status, tier, score, bias, move, horizon, analysis = await analyze_news(title, body, source)
         payload = {
             "title": title,
-            "raw_body": body,
+            "raw_body": body if body and body != title else "",
             "source": source,
-            "time": raw_news.get("time", 0),
-            "timing_status": timing,
+            "status": status,
             "tier": tier,
             "score": score,
             "bias": bias,
-            "expected_move": move,
+            "move": move,
             "horizon": horizon,
             "analysis": analysis
         }
         await broadcast(payload)
         news_queue.task_done()
-        await asyncio.sleep(2.1)
+        await asyncio.sleep(2)
 
 async def treeofalpha_stream():
     url = "wss://news.treeofalpha.com/ws"
@@ -433,59 +297,52 @@ async def treeofalpha_stream():
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             raw = json.loads(msg.data)
                             title = (raw.get("title") or "").strip()
-                            body = (raw.get("body") or raw.get("content") or "").strip()
+                            body = (raw.get("body") or "").strip()
                             source = raw.get("source") or "Tree of Alpha"
                             
-                            main_text = title if title else body
-                            if not main_text or len(main_text) < 15 or main_text in seen_titles:
+                            key = title if title else body
+                            if not key or len(key) < 10 or key in seen_titles:
                                 continue
-                            seen_titles.add(main_text)
-                            if len(seen_titles) > 500:
-                                seen_titles.clear()
+                            seen_titles.add(key)
+                            if len(seen_titles) > 500: seen_titles.clear()
                             
                             await news_queue.put({
-                                "title": title if title else body[:120] + "...",
-                                "body": body if body else title,
-                                "source": source,
-                                "time": raw.get("time", 0)
+                                "title": title if title else body[:100] + "...",
+                                "body": body,
+                                "source": source
                             })
         except Exception as e:
-            logger.error(f"Stream reconnecting: {e}")
+            logger.error(f"Stream error: {e}")
             await asyncio.sleep(3)
 
-async def index(request):
-    return web.Response(text=HTML_UI, content_type="text/html")
+async def index(request): return web.Response(text=HTML_UI, content_type="text/html")
 
 async def websocket_handler(request):
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     connected_websockets.add(ws)
-    if recent_news_cache:
-        await ws.send_str(json.dumps(recent_news_cache))
+    if recent_news_cache: await ws.send_str(json.dumps(recent_news_cache))
     try:
-        async for msg in ws:
-            pass
-    finally:
-        connected_websockets.discard(ws)
+        async for msg in ws: pass
+    finally: connected_websockets.discard(ws)
     return ws
 
-async def start_background(app):
-    app["stream_task"] = asyncio.create_task(treeofalpha_stream())
-    app["worker_task"] = asyncio.create_task(news_worker())
+async def start_bg(app):
+    app["s"] = asyncio.create_task(treeofalpha_stream())
+    app["w"] = asyncio.create_task(news_worker())
 
-async def cleanup_background(app):
-    app["stream_task"].cancel()
-    app["worker_task"].cancel()
-    await asyncio.gather(app["stream_task"], app["worker_task"], return_exceptions=True)
+async def stop_bg(app):
+    app["s"].cancel()
+    app["w"].cancel()
+    await asyncio.gather(app["s"], app["w"], return_exceptions=True)
 
 def create_app():
     app = web.Application()
     app.router.add_get("/", index)
     app.router.add_get("/ws", websocket_handler)
-    app.on_startup.append(start_background)
-    app.on_cleanup.append(cleanup_background)
+    app.on_startup.append(start_bg)
+    app.on_cleanup.append(stop_bg)
     return app
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    web.run_app(create_app(), host="0.0.0.0", port=port)
+    web.run_app(create_app(), host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
