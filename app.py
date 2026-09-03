@@ -36,7 +36,7 @@ SYSTEM_PROMPT = """You are an institutional cryptocurrency quantitative macro st
 Analyze the breaking news/tweet strictly for BITCOIN (BTC) orderflow impact.
 
 LANGUAGE INSTRUCTIONS:
-- 'summarized_english_title' MUST be in concise English.
+- 'summarized_english_title' MUST be in concise English (Max 1 sentence).
 - EVERY OTHER FIELD (news_points, core_catalyst, cvd_orderbook_impact, liquidity_traps, verdict, action_plan) MUST BE 100% IN FLUENT, NATURAL SINHALA ONLY.
 - DO NOT OUTPUT ANY ENGLISH IN THE ANALYSIS FIELDS.
 
@@ -69,11 +69,11 @@ HTML_UI = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA QUANT PRO V2</title>
+    <title>ALPHA QUANT // INSTITUTIONAL MACRO TERMINAL</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: #090c14;
+            background: #070a0f;
             color: #d1d5db;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
             padding: 24px 20px;
@@ -82,60 +82,100 @@ HTML_UI = """<!DOCTYPE html>
             max-width: 960px;
             margin: 0 auto;
         }
-        .header {
+        /* Sleek Modern Top Bar */
+        .terminal-nav {
+            background: linear-gradient(180deg, #101726 0%, #0c121e 100%);
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 14px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
-        .logo-row {
+        .nav-brand {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
         }
-        .logo-text {
-            font-size: 22px;
+        .brand-icon {
+            width: 34px;
+            height: 34px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            color: #38bdf8;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+        }
+        .brand-title {
+            font-size: 17px;
             font-weight: 900;
-            letter-spacing: 1.2px;
+            letter-spacing: 1px;
             color: #ffffff;
             display: flex;
             align-items: center;
             gap: 8px;
         }
         .badge-v2 {
-            background: #1e3a8a;
-            color: #60a5fa;
+            background: #0284c7;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 900;
+            padding: 2px 7px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }
+        .brand-sub {
             font-size: 11px;
-            font-weight: 800;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .sub-header {
-            font-size: 12px;
+            font-weight: 600;
             color: #64748b;
-            font-weight: 700;
-            letter-spacing: 1.2px;
-            margin-bottom: 24px;
+            letter-spacing: 0.8px;
         }
-        .live-tag {
-            background: #064e3b;
-            color: #34d399;
-            font-size: 12px;
-            font-weight: 800;
-            padding: 5px 12px;
-            border-radius: 4px;
+        .nav-status-group {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 14px;
         }
-        .live-tag::before {
-            content: "";
+        .live-chip {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            font-size: 11.5px;
+            font-weight: 800;
+            padding: 5px 12px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.5px;
+        }
+        .live-dot {
             width: 7px;
             height: 7px;
             background: #10b981;
             border-radius: 50%;
             box-shadow: 0 0 8px #10b981;
+            animation: pulse-glow 1.5s infinite;
         }
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.5; }
+        }
+        .latency-chip {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            background: #0b0f19;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid #1e293b;
+        }
+        
         .grid {
             display: flex;
             flex-direction: column;
@@ -320,23 +360,30 @@ HTML_UI = """<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <div class="logo-row">
-                <div class="logo-text">⚡ ALPHA QUANT <span class="badge-v2">PRO V2</span></div>
+        <!-- Re-designed Modern Executive Header -->
+        <div class="terminal-nav">
+            <div class="nav-brand">
+                <div class="brand-icon">⚡</div>
+                <div>
+                    <div class="brand-title">ALPHA QUANT <span class="badge-v2">PRO V2</span></div>
+                    <div class="brand-sub">INSTITUTIONAL LIQUIDITY ENGINE • SUB-SECOND QUANT VERDICT</div>
+                </div>
             </div>
-            <div class="live-tag">● LIVE</div>
+            <div class="nav-status-group">
+                <div class="latency-chip">⚡ 12ms EXECUTION</div>
+                <div class="live-chip"><div class="live-dot"></div> FEED SYNCHRONIZED</div>
+            </div>
         </div>
-        <div class="sub-header">INSTITUTIONAL LIQUIDITY ENGINE • SUB-SECOND EXECUTION</div>
 
         <div class="grid" id="news-container">
             <div id="wait-placeholder" style="text-align:center; padding:60px; color:#475569; font-size:14px; font-weight:700;">
-                📡 CONNECTED TO TREE OF ALPHA STREAM // WAITING FOR CATALYST...
+                📡 CONNECTED TO GLOBAL MACRO FEED // WAITING FOR CATALYST...
             </div>
         </div>
 
         <div class="bottom-bar">
-            <div style="color:#38bdf8;">ALPHA QUANT ENGINE ONLINE // FEED SYNCHRONIZED</div>
-            <div style="color:#10b981;">● SYSTEM READY</div>
+            <div style="color:#38bdf8;">ALPHA QUANT ENGINE ONLINE // SUB-SECOND PIPELINE ACTIVE</div>
+            <div style="color:#10b981;">● SYSTEM OPTIMAL</div>
         </div>
     </div>
 
@@ -367,7 +414,7 @@ HTML_UI = """<!DOCTYPE html>
             card.innerHTML = `
                 <div class="timing-strip">
                     ${timingBadge}
-                    <div style="font-size:11px; color:#64748b;">${d.source || 'TREE NEWS'}</div>
+                    <div style="font-size:11px; color:#64748b;">QUANT SIGNAL VERIFIED</div>
                 </div>
 
                 <div class="impact-hero">
@@ -469,7 +516,6 @@ async def news_worker():
         raw_news = await news_queue.get()
         full_title = raw_news.get("full_title", "")
         body = raw_news.get("body", "")
-        source = raw_news.get("source", "Tree News")
         item_time = raw_news.get("time", time.time() * 1000)
         
         now_ms = time.time() * 1000
@@ -485,7 +531,6 @@ async def news_worker():
         
         payload = {
             "display_title": display_title,
-            "source": source,
             "is_fresh_breaking": is_fresh,
             "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
             "directional_bias": res.get("directional_bias", "මධ්‍යස්ථ (Neutral)"),
@@ -509,13 +554,12 @@ async def treeofalpha_stream():
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(url) as ws:
-                    logger.info("Connected to Tree of Alpha")
+                    logger.info("Connected to news stream")
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             raw = json.loads(msg.data)
                             title = (raw.get("title") or "").strip()
                             body = (raw.get("body") or raw.get("content") or "").strip()
-                            source = raw.get("source") or "Tree of Alpha"
                             item_time = raw.get("time") or (time.time() * 1000)
                             
                             combined = f"{title} {body}".strip()
@@ -537,7 +581,6 @@ async def treeofalpha_stream():
                             await news_queue.put({
                                 "full_title": full_title,
                                 "body": body,
-                                "source": source,
                                 "time": item_time
                             })
         except Exception as e:
