@@ -442,7 +442,7 @@ HTML_UI = """<!DOCTYPE html>
         </div>
 
         <div class="disclaimer-banner">
-            ⚠️ <strong>Disclaimer:</strong> This is an AI-powered forensic crypto intelligence terminal tracking raw social sentiment & news feeds. Not an official wire news service or financial advice.
+            ⚠️ <strong>Disclaimer:</strong> Not an official wire news service. Not financial advice. For informational and tracking purposes only.
         </div>
 
         <div class="grid" id="news-container">
@@ -485,7 +485,6 @@ HTML_UI = """<!DOCTYPE html>
             }
         }
 
-        // Auto-unlock audio context on first user interaction anywhere on page
         ['click', 'keydown', 'touchstart'].forEach(evt => {
             window.addEventListener(evt, () => {
                 if (!audioCtx) {
@@ -511,8 +510,8 @@ HTML_UI = """<!DOCTYPE html>
                 const gain = audioCtx.createGain();
                 
                 osc.type = 'triangle';
-                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2); // A5
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2); 
                 
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
