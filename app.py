@@ -18,8 +18,8 @@ client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-# Active ultra-fast Groq production model (1,000 t/s)
-MODEL_NAME = "openai/gpt-oss-20b"
+# Active model from your Groq API models list
+MODEL_NAME = "qwen/qwen3.6-27b"
 
 connected_websockets = set()
 recent_news_cache = []
@@ -67,7 +67,7 @@ HTML_UI = """<!DOCTYPE html>
 <body>
     <div class="header">
         <div class="title">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Engine)</div>
+        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Qwen 3.6)</div>
     </div>
     <div class="grid" id="news-container"></div>
     <script>
