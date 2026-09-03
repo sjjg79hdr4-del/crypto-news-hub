@@ -26,23 +26,21 @@ recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are a tier-1 Bitcoin quant and institutional macro strategist.
-Analyze breaking crypto/financial headlines specifically regarding BITCOIN (BTC) market microstructure and transmission mechanisms.
-Analyze strictly in fluent, natural Sinhala. Never mention any AI model or provider names.
+SYSTEM_PROMPT = """You are an institutional macro quantitative analyst.
+Analyze breaking crypto/financial news strictly in fluent, natural Sinhala. Never mention any AI identity.
 
-You MUST follow this exact format:
+Strictly format output as:
 TIMING_BANNER: [BREAKING or PRICED_IN]
 IMPACT_TIER: [HIGH or MEDIUM or LOW]
-IMPACT_SCORE: [Number between 1 and 10]/10
+IMPACT_SCORE: [1-10]/10
 MARKET_BIAS: [BULLISH or BEARISH or NEUTRAL]
-EXPECTED_MOVE: [e.g. ±$500 - $1,200 or ±$0 - $0]
-TIME_HORIZON: [e.g. ඉදිරි පැය 1-3 තුළ or දැනටමත් සිදුවී ඇත or ඉදිරි දින කිහිපය]
+EXPECTED_MOVE: [e.g. ±$500 - $1,000 or ±$0 - $0]
+TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත or ඉදිරි සති කිහිපය]
 
 ANALYSIS_BODY:
-• සෘජු බලපෑම (Direct Impact): [BTC මිලට සහ වෙළඳපලට වන සෘජු බලපෑම පැහැදිලි කරන්න]
-• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [ආර්ථික, නියාමන හෝ අරමුදල් ගලායාම අනුව මෙම නිගමනයට ආවේ ඇයිද යන්න ගැඹුරින් විග්‍රහ කරන්න]
-• කොහොමද BTC මිලට බලපාන්නේ? (Orderbook & Liquidity Transmission): [Spot buying, Futures funding rates, liquidations සහ Orderbook depth එකට වන යාන්ත්‍රික බලපෑම]
-• කාලීන අවදානම (Timing & Late-Chasing Trap): [FOMO වීමෙන් සිදුවන trap එක හෝ නිවැරදි trading confirmation එක කුමක්ද යන්න]"""
+• සෘජු බලපෑම (Direct Impact): [පැහැදිලි කෙටි විග්‍රහයක්]
+• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [ආර්ථික හා නියාමන පසුබිම]
+• කාලීන අවදානම (Timing & Late-Chasing Trap): [වෙළඳපල අවදානම හෝ signal තත්ත්වය]"""
 
 HTML_UI = """<!DOCTYPE html>
 <html lang="si">
@@ -55,7 +53,7 @@ HTML_UI = """<!DOCTYPE html>
         body {
             background: #080c13;
             color: #d1d5db;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             padding: 30px 20px;
         }
         .header {
@@ -96,9 +94,8 @@ HTML_UI = """<!DOCTYPE html>
             animation: pulse-dot 1.5s infinite;
         }
         @keyframes pulse-dot {
-            0% { transform: scale(0.9); opacity: 0.7; }
+            0%, 100% { transform: scale(0.9); opacity: 0.7; }
             50% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(0.9); opacity: 0.7; }
         }
         .grid {
             display: flex;
@@ -108,7 +105,7 @@ HTML_UI = """<!DOCTYPE html>
             margin: 0 auto;
         }
         .waiting-box {
-            background: #0d131f;
+            background: #0e1422;
             border: 1px dashed #1e293b;
             border-radius: 8px;
             padding: 60px 20px;
@@ -320,10 +317,10 @@ async def analyze_news(full_text):
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Crypto/Macro Headline:\n{full_text[:450]}"}
+                {"role": "user", "content": f"Analyze headline:\n{full_text[:450]}"}
             ],
-            temperature=0.25,
-            max_tokens=2000
+            temperature=0.2,
+            max_tokens=1500
         )
         raw = completion.choices[0].message.content
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
@@ -359,7 +356,7 @@ async def analyze_news(full_text):
                 
         body_text = "\n".join(analysis_body).strip()
         if not body_text:
-            body_text = "• සෘජු බලපෑම (Direct Impact): BTC මිලට ක්ෂණිකව බලපාන සෘජු බලපෑමක් නොමැත.\n• ඇයි මෙහෙම වුණේ? (The Fundamental \"Why\"): මෙම ප්‍රකාශය සාමාන්‍ය පුවතක් වන අතර මූල්‍යමය හෝ ආර්ථිකමය බලපෑමක් නොමැත.\n• කොහොමද BTC මිලට බලපාන්නේ? (Orderbook & Liquidity Transmission): Spot CVD හෝ Funding rates වලට කිසිදු ක්ෂණික බලපෑමක් ඇති නොවේ.\n• කාලීන අවදානම (Timing & Late-Chasing Trap): දේශපාලන කතාබහක් වශයෙන්, BTC වෙළඳපලට අධික අවදානමක් නැත."
+            body_text = "• සෘජු බලපෑම (Direct Impact): BTC මිලට ක්ෂණිකව බලපාන සෘජු බලපෑමක් නොමැත.\n• ඇයි මෙහෙම වුණේ? (The Fundamental \"Why\"): මෙම ප්‍රකාශය අතිරේක සාකච්ඡාවක් වන අතර, නව ප්‍රතිපත්තියක් හෝ නීතිමය වෙනස්කමක් නොමැති බැවින්, මූල්‍යමය හෝ ආර්ථිකමය බලපෑමක් නොමැත.\n• කාලීන අවදානම (Timing & Late-Chasing Trap): දේශපාලන කතාබහක් වශයෙන්, BTC වෙළඳපලට අධික අවදානමක් නැත. නමුත්, නව ප්‍රතිපත්තියක් හෝ නීතිමය වෙනස්කමක් එන විට, සමාජ මාධ්‍ය හරහා හදිසි සංකේතයක් (signal) ඇති විය හැකිය."
             
         return timing, tier, score, bias, move, horizon, body_text
     except Exception as e:
