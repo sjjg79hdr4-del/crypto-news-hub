@@ -31,8 +31,8 @@ Output fluent, professional institutional Sinhala (with standard quant English t
 
 Respond ONLY with a valid JSON object matching this schema:
 {
-  "impact_mark": "e.g. 1.5 / 10 — NOISE or 8.5 / 10 — CRITICAL",
-  "directional_bias": "Neutral or Bullish or Bearish",
+  "impact_mark": "e.g. 1.5 / 10 — NOISE or 8.5 / 10 — CRITICAL ALPHA",
+  "directional_bias": "NEUTRAL or BULLISH or BEARISH",
   "expected_move": "±$0-$50",
   "window": "Immediate 60s or 5m-15m or 1h-4h",
   "bias_badge": "NEUTRAL or BULLISH or BEARISH",
@@ -52,13 +52,13 @@ HTML_UI = """<!DOCTYPE html>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: #0a0d14;
+            background: #090c14;
             color: #d1d5db;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
             padding: 24px 20px;
         }
         .container {
-            max-width: 940px;
+            max-width: 960px;
             margin: 0 auto;
         }
         .header {
@@ -73,35 +73,35 @@ HTML_UI = """<!DOCTYPE html>
             gap: 8px;
         }
         .logo-text {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 900;
-            letter-spacing: 1px;
+            letter-spacing: 1.2px;
             color: #ffffff;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
         .badge-v2 {
             background: #1e3a8a;
             color: #60a5fa;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 800;
-            padding: 2px 6px;
+            padding: 3px 8px;
             border-radius: 4px;
         }
         .sub-header {
-            font-size: 11px;
+            font-size: 12px;
             color: #64748b;
             font-weight: 700;
-            letter-spacing: 1px;
-            margin-bottom: 18px;
+            letter-spacing: 1.2px;
+            margin-bottom: 24px;
         }
         .live-tag {
             background: #064e3b;
             color: #34d399;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 800;
-            padding: 4px 10px;
+            padding: 5px 12px;
             border-radius: 4px;
             display: flex;
             align-items: center;
@@ -109,143 +109,131 @@ HTML_UI = """<!DOCTYPE html>
         }
         .live-tag::before {
             content: "";
-            width: 6px;
-            height: 6px;
+            width: 7px;
+            height: 7px;
             background: #10b981;
             border-radius: 50%;
-            box-shadow: 0 0 6px #10b981;
-        }
-        .banner-exclusive {
-            background: #101622;
-            border: 1px solid #1e293b;
-            border-radius: 6px;
-            padding: 10px 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 22px;
-        }
-        .exclusive-badge {
-            background: #78350f;
-            color: #fef08a;
-            font-size: 10px;
-            font-weight: 800;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-right: 8px;
-        }
-        .exclusive-text {
-            font-size: 12px;
-            font-weight: 700;
-            color: #cbd5e1;
-        }
-        .btn-claim {
-            background: #f59e0b;
-            color: #000;
-            font-size: 11px;
-            font-weight: 800;
-            padding: 5px 12px;
-            border-radius: 4px;
-            text-decoration: none;
+            box-shadow: 0 0 8px #10b981;
         }
         .grid {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 24px;
         }
         .card {
-            background: #0f1420;
+            background: #0d121d;
             border: 1px solid #1a2233;
-            border-radius: 8px;
-            padding: 22px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 26px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
         }
-        .news-header-row {
+        .impact-hero {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            gap: 16px;
-            margin-bottom: 16px;
+            align-items: center;
+            background: #131b2a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
         }
-        .full-news-title {
-            font-size: 14.5px;
-            font-weight: 600;
-            color: #f1f5f9;
-            line-height: 1.55;
-            flex: 1;
+        .impact-hero-left {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .impact-label {
+            font-size: 11.5px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #94a3b8;
+        }
+        .impact-val {
+            font-size: 18px;
+            font-weight: 900;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .badge-bias {
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 10.5px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 1px;
             white-space: nowrap;
         }
         .bias-NEUTRAL { background: #271e11; color: #fbbf24; border: 1px solid #78350f; }
         .bias-BULLISH { background: #064e3b; color: #34d399; border: 1px solid #059669; }
         .bias-BEARISH { background: #451319; color: #f87171; border: 1px solid #991b1b; }
 
+        .full-news-title {
+            font-size: 16.5px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.6;
+            margin-bottom: 18px;
+        }
         .metric-summary {
-            font-size: 12.5px;
-            line-height: 1.8;
+            font-size: 14px;
+            line-height: 1.9;
             color: #94a3b8;
             border-bottom: 1px solid #1a2333;
-            padding-bottom: 14px;
-            margin-bottom: 14px;
+            padding-bottom: 16px;
+            margin-bottom: 18px;
         }
         .metric-summary span {
             color: #f1f5f9;
-            font-weight: 600;
-        }
-
-        .section-header {
-            font-size: 13px;
             font-weight: 700;
-            color: #cbd5e1;
-            margin-bottom: 10px;
+        }
+        .section-header {
+            font-size: 14.5px;
+            font-weight: 800;
+            color: #38bdf8;
+            margin-bottom: 12px;
         }
         .points-list {
-            font-size: 12.5px;
-            line-height: 1.75;
+            font-size: 14px;
+            line-height: 1.85;
             color: #94a3b8;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
         .points-list div {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
         .points-list strong {
-            color: #cbd5e1;
+            color: #e2e8f0;
         }
-
         .verdict-box {
             border-top: 1px solid #1a2333;
-            padding-top: 14px;
-            font-size: 12.5px;
-            line-height: 1.7;
+            padding-top: 16px;
+            font-size: 14px;
+            line-height: 1.8;
         }
         .verdict-title {
             color: #fbbf24;
-            font-weight: 800;
-            margin-bottom: 4px;
+            font-size: 14.5px;
+            font-weight: 900;
+            margin-bottom: 6px;
         }
         .verdict-text {
-            color: #94a3b8;
+            color: #cbd5e1;
         }
         .card-time {
             text-align: right;
-            font-size: 10.5px;
+            font-size: 11px;
             color: #475569;
-            margin-top: 10px;
+            margin-top: 12px;
         }
         .bottom-bar {
-            margin-top: 24px;
+            margin-top: 28px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 800;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
         }
     </style>
 </head>
@@ -259,23 +247,15 @@ HTML_UI = """<!DOCTYPE html>
         </div>
         <div class="sub-header">INSTITUTIONAL LIQUIDITY ENGINE • SUB-SECOND EXECUTION</div>
 
-        <div class="banner-exclusive">
-            <div>
-                <span class="exclusive-badge">EXCLUSIVE</span>
-                <span class="exclusive-text">Institutional Zero-Fee Crypto Perpetuals & Sign-up Bonus</span>
-            </div>
-            <a href="#" class="btn-claim">Claim Perk ↗</a>
-        </div>
-
         <div class="grid" id="news-container">
-            <div id="wait-placeholder" style="text-align:center; padding:50px; color:#475569; font-size:13px;">
+            <div id="wait-placeholder" style="text-align:center; padding:60px; color:#475569; font-size:14px; font-weight:700;">
                 📡 CONNECTED TO TREE OF ALPHA STREAM // WAITING FOR CATALYST...
             </div>
         </div>
 
         <div class="bottom-bar">
             <div style="color:#38bdf8;">ALPHA QUANT ENGINE ONLINE // FEED SYNCHRONIZED</div>
-            <div style="color:#10b981;">● BULLISH</div>
+            <div style="color:#10b981;">● SYSTEM READY</div>
         </div>
     </div>
 
@@ -288,16 +268,20 @@ HTML_UI = """<!DOCTYPE html>
             const card = document.createElement("div");
             card.className = "card";
 
-            const bias = (d.bias_badge || "NEUTRAL").toUpperCase();
+            const bias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
 
             card.innerHTML = `
-                <div class="news-header-row">
-                    <div class="full-news-title">${d.title}</div>
-                    <div class="badge-bias bias-${bias}">${bias}</div>
+                <div class="impact-hero">
+                    <div class="impact-hero-left">
+                        <div class="impact-label">📌 IMPACT SCORE & EVALUATION</div>
+                        <div class="impact-val">⚡ ${d.impact_mark}</div>
+                    </div>
+                    <div class="badge-bias bias-${bias}">● ${bias}</div>
                 </div>
 
+                <div class="full-news-title">${d.title}</div>
+
                 <div class="metric-summary">
-                    <div>📌 <strong>Impact Mark:</strong> <span>${d.impact_mark}</span></div>
                     <div>🎯 <strong>Directional Bias:</strong> <span>● ${d.directional_bias}</span></div>
                     <div>⚡ <strong>BTC Expected Move:</strong> <span>${d.expected_move}</span> | <strong>Window:</strong> <span>${d.window}</span></div>
                 </div>
@@ -350,7 +334,7 @@ async def analyze_news(text):
         logger.error(f"Analysis error: {e}")
         return {
             "impact_mark": "1.5 / 10 — NOISE",
-            "directional_bias": "Neutral",
+            "directional_bias": "NEUTRAL",
             "expected_move": "±$0-$50",
             "window": "Immediate 60s",
             "bias_badge": "NEUTRAL",
@@ -379,7 +363,7 @@ async def news_worker():
         payload = {
             "title": full_title,
             "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
-            "directional_bias": res.get("directional_bias", "Neutral"),
+            "directional_bias": res.get("directional_bias", "NEUTRAL"),
             "expected_move": res.get("expected_move", "±$0-$50"),
             "window": res.get("window", "Immediate 60s"),
             "bias_badge": res.get("bias_badge", "NEUTRAL"),
