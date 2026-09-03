@@ -19,7 +19,6 @@ client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-# Verified official production model with flawless JSON schema execution
 MODEL_NAME = "openai/gpt-oss-20b"
 
 connected_websockets = set()
@@ -39,7 +38,7 @@ You MUST respond strictly with a valid JSON object matching this schema:
   "bias": "BULLISH" or "BEARISH" or "NEUTRAL",
   "expected_move": "e.g. ±$800 - $1,500 or ±$0 - $0",
   "horizon": "e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත",
-  "direct_impact": "මෙම පුවතේ සඳහන් කරුණු කෙළින්ම BTC මිලට සහ ක්‍රිප්ටෝ වෙළඳපලට බලපාන සැබෑ ආකාරය සවිස්තරාත්මකව.",
+  "direct_impact": "BTC මිලට සහ වෙළඳපලට මෙම පුවත සෘජුව හෝ වක්‍රව සම්ප්‍රේෂණය වන සැබෑ ආකාරය සවිස්තරාත්මකව.",
   "why": "මෙම නිගමනයට පැමිණි මූලික ආර්ථික, නියාමන (SEC/Fed), හෝ ETF/Spot liquidity අරමුදල් ගලායාමේ හේතුව.",
   "trap_risk": "BTC Traders ලා සඳහා කාලීන උපදෙස්: මෙය Late-Chasing Trap එකක්ද? Liquidation අවදානම සහ Trade එකක් ගත යුතු නිවැරදි ආකාරය."
 }"""
@@ -59,7 +58,7 @@ HTML_UI = """<!DOCTYPE html>
             padding: 30px 20px;
         }
         .header {
-            max-width: 900px;
+            max-width: 960px;
             margin: 0 auto 24px auto;
             display: flex;
             justify-content: space-between;
@@ -98,14 +97,14 @@ HTML_UI = """<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             gap: 20px;
-            max-width: 900px;
+            max-width: 960px;
             margin: 0 auto;
         }
         .card {
             background: #0e1422;
             border: 1px solid #1a2233;
             border-radius: 8px;
-            padding: 24px;
+            padding: 26px;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
         }
         .banner-row {
@@ -145,11 +144,12 @@ HTML_UI = """<!DOCTYPE html>
         .tier-HIGH { background: #2d1217; color: #f87171; border: 1px solid #7f1d1d; }
         
         .news-title {
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 700;
             color: #ffffff;
             margin-bottom: 20px;
-            line-height: 1.5;
+            line-height: 1.6;
+            word-break: break-word;
         }
         .divider {
             height: 1px;
@@ -200,7 +200,7 @@ HTML_UI = """<!DOCTYPE html>
     </div>
     <div class="grid" id="news-container">
         <div id="wait-msg" style="text-align:center; padding:60px 20px; color:#64748b;">
-            📡 Tree of Alpha සජීවී විකාශයට සම්බන්ධ වී ඇත. නව පුවතක් ලැබුණු සැනින් ආයතනික විශ්ලේෂණය මෙහි දිස්වනු ඇත...
+            📡 Tree of Alpha සජීවී විකාශයට සම්බන්ධ වී ඇත. නව පුවතක් ලැබුණු සැනින් සම්පූර්ණ සිරස්තලය හා ආයතනික විශ්ලේෂණය මෙහි දිස්වනු ඇත...
         </div>
     </div>
     <script>
@@ -256,7 +256,7 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze this breaking news regarding Bitcoin impact:\n{text[:1500]}"
+    prompt_payload = f"Analyze this breaking news regarding Bitcoin impact:\n{text[:2000]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -286,17 +286,16 @@ async def analyze_news(text):
             return json.loads(completion.choices[0].message.content)
         except Exception as err2:
             logger.error(f"Fallback model error: {err2}")
-            # Real dynamic error display without dummy generic text
             return {
                 "timing_status": "PRICED_IN",
                 "tier": "LOW",
                 "score": "1 / 10",
                 "bias": "NEUTRAL",
                 "expected_move": "±$0 - $0",
-                "horizon": "ක්ෂණිකව",
-                "direct_impact": f"පුවත විශ්ලේෂණය කිරීමේදී දෝෂයක් ඇතිවිය: {str(err2)[:120]}",
-                "why": "API ප්‍රතිචාරය කියවීමේ තාක්ෂණික දෝෂයකි.",
-                "trap_risk": "දත්ත නැවත සැකසෙන තුරු වෙළඳපල trade නොගන්න."
+                "horizon": "දැනටමත් සිදුවී ඇත",
+                "direct_impact": f"පුවත විශ්ලේෂණය කිරීමේ තාක්ෂණික දෝෂයකි: {str(err2)[:120]}",
+                "why": "API දත්ත ලබාගැනීමේදී ගැටලුවක් මතු විය.",
+                "trap_risk": "දත්ත නැවත සැකසෙන තුරු අවදානම් සහිත trade නොගන්න."
             }
 
 async def broadcast(item):
@@ -309,13 +308,13 @@ async def broadcast(item):
 async def news_worker():
     while True:
         raw_news = await news_queue.get()
-        title = raw_news.get("title", "")
+        full_display_title = raw_news.get("full_title", "")
         body = raw_news.get("body", "")
-        content = f"Headline: {title}\nFull Text/Tweet: {body}".strip()
+        content = f"Headline: {full_display_title}\nFull Text/Tweet: {body}".strip()
         
         res = await analyze_news(content)
         payload = {
-            "title": title if title else body[:120],
+            "title": full_display_title,
             "timing_status": res.get("timing_status", "PRICED_IN"),
             "tier": res.get("tier", "LOW"),
             "score": res.get("score", "2 / 10"),
@@ -343,14 +342,19 @@ async def treeofalpha_stream():
                             title = (raw.get("title") or "").strip()
                             body = (raw.get("body") or raw.get("content") or "").strip()
                             
-                            key = title if title else body
-                            if not key or len(key) < 15 or key in seen_titles:
+                            # Combine full context so title is never cut off
+                            if title and body and title not in body:
+                                full_title = f"{title} — {body}"
+                            else:
+                                full_title = title if title else body
+                            
+                            if not full_title or len(full_title) < 15 or full_title in seen_titles:
                                 continue
-                            seen_titles.add(key)
+                            seen_titles.add(full_title)
                             if len(seen_titles) > 500: seen_titles.clear()
                             
                             await news_queue.put({
-                                "title": title if title else body[:120],
+                                "full_title": full_title,
                                 "body": body
                             })
         except Exception as e:
