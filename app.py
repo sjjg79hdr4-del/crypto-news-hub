@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import asyncio
 import logging
@@ -18,7 +19,6 @@ client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-# Active model from your Groq API models list
 MODEL_NAME = "qwen/qwen3.6-27b"
 
 connected_websockets = set()
@@ -28,6 +28,7 @@ news_queue = asyncio.Queue()
 
 SYSTEM_PROMPT = """You are a senior institutional quantitative crypto analyst.
 Analyze the given breaking crypto/financial news strictly in fluent, natural Sinhala.
+Do NOT output English reasoning or <think> tags. Answer directly and concisely.
 
 Respond EXACTLY in this format:
 TIMING_STATUS: [BREAKING or PRICED_IN]
@@ -67,7 +68,7 @@ HTML_UI = """<!DOCTYPE html>
 <body>
     <div class="header">
         <div class="title">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Qwen 3.6)</div>
+        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Qwen 3.6 Pro)</div>
     </div>
     <div class="grid" id="news-container"></div>
     <script>
@@ -109,10 +110,14 @@ async def analyze_news(full_text):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Crypto News:\n{full_text[:400]}"}
             ],
-            temperature=0.2,
-            max_tokens=450
+            temperature=0.3,
+            max_tokens=1500
         )
         raw = completion.choices[0].message.content
+        
+        # Clean any internal reasoning tags if present
+        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+        
         status, tier = "BREAKING", "LOW"
         lines, remaining = raw.splitlines(), []
         for line in lines:
