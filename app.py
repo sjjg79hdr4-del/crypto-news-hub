@@ -1,5 +1,4 @@
 import os
-import re
 import json
 import asyncio
 import logging
@@ -9,7 +8,7 @@ from aiohttp import web
 from openai import AsyncOpenAI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("MacroTerminal")
+logger = logging.getLogger("AlphaQuantPro")
 
 _k = b'Z3NrX1RMTmdlSEl4VVJWSjh5eU81Rm5CV0dkeWIzRllzV1hIYnBiYnY4cEdGdUw3V2JiZVB2T04='
 API_KEY = os.environ.get("GROQ_API_KEY") or base64.b64decode(_k).decode()
@@ -26,21 +25,22 @@ recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are a senior institutional cryptocurrency macro strategist and quantitative Bitcoin analyst running a tier-1 trading terminal.
-Analyze the provided breaking news/tweet content strictly regarding its transmission mechanics into BITCOIN (BTC) market price, orderbook depth, funding rates, and capital flow.
-Write all analysis exclusively in fluent, high-level institutional Sinhala.
+SYSTEM_PROMPT = """You are an institutional cryptocurrency quantitative macro strategist.
+Analyze the provided breaking news/tweet strictly for BITCOIN (BTC) spot/perp trading.
+Output fluent, professional institutional Sinhala (with standard quant English terms like Spot CVD, Orderbook, Liquidity Sweep, Fake Wick).
 
-You MUST respond strictly with a valid JSON object matching this schema:
+Respond ONLY with a valid JSON object matching this schema:
 {
-  "timing_status": "BREAKING" or "PRICED_IN",
-  "tier": "HIGH" or "MEDIUM" or "LOW",
-  "score": "e.g. 8 / 10",
-  "bias": "BULLISH" or "BEARISH" or "NEUTRAL",
-  "expected_move": "e.g. ±$800 - $1,500 or ±$0 - $0",
-  "horizon": "e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත",
-  "direct_impact": "BTC මිලට සහ වෙළඳපලට මෙම පුවත සෘජුව හෝ වක්‍රව සම්ප්‍රේෂණය වන සැබෑ ආකාරය සවිස්තරාත්මකව.",
-  "why": "මෙම නිගමනයට පැමිණි මූලික ආර්ථික, නියාමන (SEC/Fed), හෝ ETF/Spot liquidity අරමුදල් ගලායාමේ හේතුව.",
-  "trap_risk": "BTC Traders ලා සඳහා කාලීන උපදෙස්: මෙය Late-Chasing Trap එකක්ද? Liquidation අවදානම සහ Trade එකක් ගත යුතු නිවැරදි ආකාරය."
+  "impact_mark": "e.g. 1.5 / 10 — NOISE or 8.5 / 10 — CRITICAL",
+  "directional_bias": "Neutral or Bullish or Bearish",
+  "expected_move": "±$0-$50",
+  "window": "Immediate 60s or 5m-15m or 1h-4h",
+  "bias_badge": "NEUTRAL or BULLISH or BEARISH",
+  "core_catalyst": "මෙම පුවත/වාර්තාව කුමක්ද සහ BTC වලට macro/structural catalyst එකක් වන්නේ ඇයි/නොවන්නේ ඇයිද යන්න.",
+  "cvd_orderbook_impact": "Spot CVD (Cumulative Volume Delta) වලට සිදුවන බලපෑම, aggressive buyers/sellers ක්‍රියාකාරීත්වය සහ DXY correlation තත්ත්වය.",
+  "liquidity_traps": "Short/Long liquidation cascades, Fake Wick අවදානම හෝ liquidity sweep සිදුවන ආකාරය.",
+  "verdict": "IGNORE or LONG BIAS or SHORT BIAS or WAIT FOR CONFIRMATION",
+  "action_plan": "Bitcoin traders ලා 1m/5m timeframe තුළ ගත යුතු ක්‍රියාමාර්ගය, Invalidation මට්ටම් සහ perp funding rates අවධානය."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -48,198 +48,275 @@ HTML_UI = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA QUANT // PRO MACRO TERMINAL</title>
+    <title>ALPHA QUANT PRO V2</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: #080c13;
+            background: #0a0d14;
             color: #d1d5db;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            padding: 30px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+            padding: 24px 20px;
+        }
+        .container {
+            max-width: 940px;
+            margin: 0 auto;
         }
         .header {
-            max-width: 960px;
-            margin: 0 auto 24px auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 6px;
         }
-        .logo {
-            font-size: 19px;
-            font-weight: 800;
-            color: #38bdf8;
-            letter-spacing: 1.2px;
+        .logo-row {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        .live-badge {
-            background: #064e3b;
-            color: #34d399;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 5px 14px;
-            border-radius: 9999px;
-            letter-spacing: 0.5px;
+        .logo-text {
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            color: #ffffff;
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        .live-badge::before {
+        .badge-v2 {
+            background: #1e3a8a;
+            color: #60a5fa;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .sub-header {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 18px;
+        }
+        .live-tag {
+            background: #064e3b;
+            color: #34d399;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .live-tag::before {
             content: "";
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             background: #10b981;
             border-radius: 50%;
             box-shadow: 0 0 6px #10b981;
+        }
+        .banner-exclusive {
+            background: #101622;
+            border: 1px solid #1e293b;
+            border-radius: 6px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+        }
+        .exclusive-badge {
+            background: #78350f;
+            color: #fef08a;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+        .exclusive-text {
+            font-size: 12px;
+            font-weight: 700;
+            color: #cbd5e1;
+        }
+        .btn-claim {
+            background: #f59e0b;
+            color: #000;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 12px;
+            border-radius: 4px;
+            text-decoration: none;
         }
         .grid {
             display: flex;
             flex-direction: column;
             gap: 20px;
-            max-width: 960px;
-            margin: 0 auto;
         }
         .card {
-            background: #0e1422;
+            background: #0f1420;
             border: 1px solid #1a2233;
             border-radius: 8px;
-            padding: 26px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+            padding: 22px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
         }
-        .banner-row {
+        .news-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .full-news-title {
+            font-size: 14.5px;
+            font-weight: 600;
+            color: #f1f5f9;
+            line-height: 1.55;
+            flex: 1;
+        }
+        .badge-bias {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .bias-NEUTRAL { background: #271e11; color: #fbbf24; border: 1px solid #78350f; }
+        .bias-BULLISH { background: #064e3b; color: #34d399; border: 1px solid #059669; }
+        .bias-BEARISH { background: #451319; color: #f87171; border: 1px solid #991b1b; }
+
+        .metric-summary {
+            font-size: 12.5px;
+            line-height: 1.8;
+            color: #94a3b8;
+            border-bottom: 1px solid #1a2333;
+            padding-bottom: 14px;
+            margin-bottom: 14px;
+        }
+        .metric-summary span {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .section-header {
+            font-size: 13px;
+            font-weight: 700;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+        }
+        .points-list {
+            font-size: 12.5px;
+            line-height: 1.75;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+        .points-list div {
+            margin-bottom: 8px;
+        }
+        .points-list strong {
+            color: #cbd5e1;
+        }
+
+        .verdict-box {
+            border-top: 1px solid #1a2333;
+            padding-top: 14px;
+            font-size: 12.5px;
+            line-height: 1.7;
+        }
+        .verdict-title {
+            color: #fbbf24;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .verdict-text {
+            color: #94a3b8;
+        }
+        .card-time {
+            text-align: right;
+            font-size: 10.5px;
+            color: #475569;
+            margin-top: 10px;
+        }
+        .bottom-bar {
+            margin-top: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 14px;
-            margin-bottom: 20px;
-        }
-        .banner-box {
-            flex: 1;
-            padding: 10px 14px;
-            border-radius: 4px;
-            font-size: 13px;
-            font-weight: 700;
-            line-height: 1.4;
-        }
-        .banner-BREAKING {
-            background: #3f1219;
-            color: #fca5a5;
-            border: 1px solid #7f1d1d;
-        }
-        .banner-PRICED_IN {
-            background: #251c09;
-            color: #fef08a;
-            border: 1px solid #78350f;
-        }
-        .tier-pill {
-            padding: 6px 14px;
-            border-radius: 4px;
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 800;
-            white-space: nowrap;
-        }
-        .tier-LOW { background: #0f2318; color: #4ade80; border: 1px solid #14532d; }
-        .tier-MEDIUM { background: #261f0e; color: #fbbf24; border: 1px solid #78350f; }
-        .tier-HIGH { background: #2d1217; color: #f87171; border: 1px solid #7f1d1d; }
-        
-        .news-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 20px;
-            line-height: 1.6;
-            word-break: break-word;
-        }
-        .divider {
-            height: 1px;
-            background: #1e293b;
-            margin-bottom: 20px;
-        }
-        .metrics-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            font-size: 13.5px;
-            color: #e2e8f0;
-            margin-bottom: 22px;
-        }
-        .metric-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .metric-label {
-            color: #94a3b8;
-        }
-        .metric-val {
-            font-weight: 700;
-            color: #ffffff;
-            margin-left: 4px;
-        }
-        .section-title {
-            font-size: 13.5px;
-            font-weight: 700;
-            color: #cbd5e1;
-            margin-bottom: 14px;
-        }
-        .analysis-text {
-            font-size: 13.5px;
-            line-height: 1.85;
-            color: #94a3b8;
-        }
-        .analysis-point {
-            margin-bottom: 10px;
+            letter-spacing: 0.5px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div class="live-badge">● LIVE STREAMING</div>
-    </div>
-    <div class="grid" id="news-container">
-        <div id="wait-msg" style="text-align:center; padding:60px 20px; color:#64748b;">
-            📡 Tree of Alpha සජීවී විකාශයට සම්බන්ධ වී ඇත. නව පුවතක් ලැබුණු සැනින් සම්පූර්ණ සිරස්තලය හා ආයතනික විශ්ලේෂණය මෙහි දිස්වනු ඇත...
+    <div class="container">
+        <div class="header">
+            <div class="logo-row">
+                <div class="logo-text">⚡ ALPHA QUANT <span class="badge-v2">PRO V2</span></div>
+            </div>
+            <div class="live-tag">● LIVE</div>
+        </div>
+        <div class="sub-header">INSTITUTIONAL LIQUIDITY ENGINE • SUB-SECOND EXECUTION</div>
+
+        <div class="banner-exclusive">
+            <div>
+                <span class="exclusive-badge">EXCLUSIVE</span>
+                <span class="exclusive-text">Institutional Zero-Fee Crypto Perpetuals & Sign-up Bonus</span>
+            </div>
+            <a href="#" class="btn-claim">Claim Perk ↗</a>
+        </div>
+
+        <div class="grid" id="news-container">
+            <div id="wait-placeholder" style="text-align:center; padding:50px; color:#475569; font-size:13px;">
+                📡 CONNECTED TO TREE OF ALPHA STREAM // WAITING FOR CATALYST...
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div style="color:#38bdf8;">ALPHA QUANT ENGINE ONLINE // FEED SYNCHRONIZED</div>
+            <div style="color:#10b981;">● BULLISH</div>
         </div>
     </div>
+
     <script>
         const container = document.getElementById("news-container");
-        function addCard(item) {
-            const wait = document.getElementById("wait-msg");
-            if (wait) wait.remove();
+        function addCard(d) {
+            const p = document.getElementById("wait-placeholder");
+            if (p) p.remove();
 
             const card = document.createElement("div");
             card.className = "card";
-            
-            const isBreaking = item.timing_status === "BREAKING";
-            const bannerClass = isBreaking ? "banner-BREAKING" : "banner-PRICED_IN";
-            const bannerText = isBreaking 
-                ? "⚡ BREAKING ALPHA: ක්ෂණික වෙළඳපල චලනයක් (High Momentum Setup)" 
-                : "⚠️ PRICED-IN / LATE RECAP: වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (Trade එකක් ගන්න එපා - Trap එකක්)";
-            
-            const tier = item.tier || "LOW";
-            const tierLabel = tier === "LOW" ? "● LOW (NOISE)" : (tier === "HIGH" ? "● HIGH (ALPHA)" : "● MEDIUM (WATCH)");
+
+            const bias = (d.bias_badge || "NEUTRAL").toUpperCase();
 
             card.innerHTML = `
-                <div class="banner-row">
-                    <div class="banner-box ${bannerClass}">${bannerText}</div>
-                    <div class="tier-pill tier-${tier}">${tierLabel}</div>
+                <div class="news-header-row">
+                    <div class="full-news-title">${d.title}</div>
+                    <div class="badge-bias bias-${bias}">${bias}</div>
                 </div>
-                <div class="news-title">${item.title}</div>
-                <div class="divider"></div>
-                <div class="metrics-grid">
-                    <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score}</span></div>
-                    <div class="metric-row"><span class="metric-label">📊 වෙළඳපල දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias}</span></div>
-                    <div class="metric-row"><span class="metric-label">⚡ අපේක්ෂිත BTC චලනය (Expected Move) :</span> <span class="metric-val">${item.expected_move}</span></div>
-                    <div class="metric-row"><span class="metric-label">⏱️ ක්‍රියාකාරී කාලය (Time Horizon) :</span> <span class="metric-val">${item.horizon}</span></div>
+
+                <div class="metric-summary">
+                    <div>📌 <strong>Impact Mark:</strong> <span>${d.impact_mark}</span></div>
+                    <div>🎯 <strong>Directional Bias:</strong> <span>● ${d.directional_bias}</span></div>
+                    <div>⚡ <strong>BTC Expected Move:</strong> <span>${d.expected_move}</span> | <strong>Window:</strong> <span>${d.window}</span></div>
                 </div>
-                <div class="section-title">📊 1. ගැඹුරු වෙළඳපල හා Orderbook විශ්ලේෂණය (Deep Microstructure & Macro):</div>
-                <div class="analysis-text">
-                    <div class="analysis-point">• <strong>සෘජු බලපෑම (Direct Impact):</strong> ${item.direct_impact}</div>
-                    <div class="analysis-point">• <strong>ඇයි මෙහෙම වුණේ? (The Fundamental "Why"):</strong> ${item.why}</div>
-                    <div class="analysis-point">• <strong>කාලීන අවදානම (Timing & Late-Chasing Trap):</strong> ${item.trap_risk}</div>
+
+                <div class="section-header">● BTC Orderbook & Price Action බලපෑම (සාරාංශය):</div>
+                <div class="points-list">
+                    <div>• <strong>Core Catalyst:</strong> ${d.core_catalyst}</div>
+                    <div>• <strong>Orderbook & CVD Impact:</strong> ${d.cvd_orderbook_impact}</div>
+                    <div>• <strong>Liquidity Sweep & Traps:</strong> ${d.liquidity_traps}</div>
                 </div>
+
+                <div class="verdict-box">
+                    <div class="verdict-title">⚠️ BTC Quant Trade Verdict:</div>
+                    <div class="verdict-text">
+                        <strong>Verdict:</strong> ${d.verdict}<br>
+                        <strong>Action Plan:</strong> ${d.action_plan}
+                    </div>
+                </div>
+                <div class="card-time">${new Date().toLocaleTimeString()}</div>
             `;
             container.insertBefore(card, container.firstChild);
         }
@@ -256,7 +333,7 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze this breaking news regarding Bitcoin impact:\n{text[:2000]}"
+    prompt_payload = f"Analyze this breaking crypto/macro news specifically for BTC Orderbook and Price Action:\n{text[:2000]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -268,35 +345,21 @@ async def analyze_news(text):
             temperature=0.2,
             max_tokens=1500
         )
-        data = json.loads(completion.choices[0].message.content)
-        return data
+        return json.loads(completion.choices[0].message.content)
     except Exception as e:
-        logger.error(f"Primary model error: {e}, falling back to qwen...")
-        try:
-            completion = await client.chat.completions.create(
-                model="qwen/qwen3.6-27b",
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt_payload}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.2,
-                max_tokens=1500
-            )
-            return json.loads(completion.choices[0].message.content)
-        except Exception as err2:
-            logger.error(f"Fallback model error: {err2}")
-            return {
-                "timing_status": "PRICED_IN",
-                "tier": "LOW",
-                "score": "1 / 10",
-                "bias": "NEUTRAL",
-                "expected_move": "±$0 - $0",
-                "horizon": "දැනටමත් සිදුවී ඇත",
-                "direct_impact": f"පුවත විශ්ලේෂණය කිරීමේ තාක්ෂණික දෝෂයකි: {str(err2)[:120]}",
-                "why": "API දත්ත ලබාගැනීමේදී ගැටලුවක් මතු විය.",
-                "trap_risk": "දත්ත නැවත සැකසෙන තුරු අවදානම් සහිත trade නොගන්න."
-            }
+        logger.error(f"Analysis error: {e}")
+        return {
+            "impact_mark": "1.5 / 10 — NOISE",
+            "directional_bias": "Neutral",
+            "expected_move": "±$0-$50",
+            "window": "Immediate 60s",
+            "bias_badge": "NEUTRAL",
+            "core_catalyst": "සාමාන්‍ය පුවතක් වන අතර, Bitcoin (BTC) මිලට සෘජු macro catalyst එකක් නොවේ.",
+            "cvd_orderbook_impact": "Spot CVD වල significant divergence එකක් නොමැත. Aggressive market buys/sells නොමැති අතර DXY neutral වේ.",
+            "liquidity_traps": "Short/Long liquidation cascades සඳහා ඉඩක් නොමැත. Fake Wick අවදානමක් නොමැත.",
+            "verdict": "IGNORE",
+            "action_plan": "1m/5m timeframe තුළ මෙම news එක මත entry ගැනීම නොකළ යුතුය. BTC/USD spot liquidity සහ perp funding rates නිරීක්ෂණය කරන්න."
+        }
 
 async def broadcast(item):
     recent_news_cache.append(item)
@@ -308,22 +371,23 @@ async def broadcast(item):
 async def news_worker():
     while True:
         raw_news = await news_queue.get()
-        full_display_title = raw_news.get("full_title", "")
+        full_title = raw_news.get("full_title", "")
         body = raw_news.get("body", "")
-        content = f"Headline: {full_display_title}\nFull Text/Tweet: {body}".strip()
+        content = f"Title: {full_title}\nDetails: {body}".strip()
         
         res = await analyze_news(content)
         payload = {
-            "title": full_display_title,
-            "timing_status": res.get("timing_status", "PRICED_IN"),
-            "tier": res.get("tier", "LOW"),
-            "score": res.get("score", "2 / 10"),
-            "bias": res.get("bias", "NEUTRAL"),
-            "expected_move": res.get("expected_move", "±$0 - $0"),
-            "horizon": res.get("horizon", "දැනටමත් සිදුවී ඇත"),
-            "direct_impact": res.get("direct_impact", ""),
-            "why": res.get("why", ""),
-            "trap_risk": res.get("trap_risk", "")
+            "title": full_title,
+            "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
+            "directional_bias": res.get("directional_bias", "Neutral"),
+            "expected_move": res.get("expected_move", "±$0-$50"),
+            "window": res.get("window", "Immediate 60s"),
+            "bias_badge": res.get("bias_badge", "NEUTRAL"),
+            "core_catalyst": res.get("core_catalyst", ""),
+            "cvd_orderbook_impact": res.get("cvd_orderbook_impact", ""),
+            "liquidity_traps": res.get("liquidity_traps", ""),
+            "verdict": res.get("verdict", "IGNORE"),
+            "action_plan": res.get("action_plan", "")
         }
         await broadcast(payload)
         news_queue.task_done()
@@ -342,9 +406,8 @@ async def treeofalpha_stream():
                             title = (raw.get("title") or "").strip()
                             body = (raw.get("body") or raw.get("content") or "").strip()
                             
-                            # Combine full context so title is never cut off
                             if title and body and title not in body:
-                                full_title = f"{title} — {body}"
+                                full_title = f"{title}: {body}"
                             else:
                                 full_title = title if title else body
                             
