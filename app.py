@@ -146,7 +146,8 @@ HTML_UI = """<!DOCTYPE html>
         .nav-status-group {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         .sound-toggle-btn {
             background: #1e293b;
@@ -162,6 +163,15 @@ HTML_UI = """<!DOCTYPE html>
         .sound-toggle-btn:hover {
             background: #334155;
             color: #ffffff;
+        }
+        .online-chip {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #38bdf8;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 10px;
+            border-radius: 6px;
         }
         .live-chip {
             background: rgba(16, 185, 129, 0.1);
@@ -436,6 +446,7 @@ HTML_UI = """<!DOCTYPE html>
             </div>
             <div class="nav-status-group">
                 <button class="sound-toggle-btn" id="sound-btn" onclick="toggleSound()">🔊 SOUND: ENABLED</button>
+                <div class="online-chip" id="online-count-chip">👤 ONLINE: 1</div>
                 <div class="latency-chip">⚡ 12ms EXECUTION</div>
                 <div class="live-chip" id="status-chip"><div class="live-dot"></div> FEED SYNCHRONIZED</div>
             </div>
@@ -628,11 +639,16 @@ HTML_UI = """<!DOCTYPE html>
             ws.onmessage = (e) => {
                 if (e.data === "pong") return;
                 try {
-                    const data = JSON.parse(e.data);
-                    if (Array.isArray(data)) { 
-                        data.forEach(item => addCard(item, true)); 
+                    const msg = JSON.parse(e.data);
+                    // Check if it's an online count update broadcast
+                    if (msg.type === "online_count") {
+                        document.getElementById("online-count-chip").innerText = `👤 ONLINE: ${msg.count}`;
+                        return;
+                    }
+                    if (Array.isArray(msg)) { 
+                        msg.forEach(item => addCard(item, true)); 
                     } else { 
-                        addCard(data, false); 
+                        addCard(msg, false); 
                     }
                 } catch(err) {}
             };
@@ -692,6 +708,16 @@ RAW SOURCE CONTENT:
             "verdict": "නොසලකා හරින්න (IGNORE)",
             "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැති බැවින් trade නොගෙන ප්‍රාග්ධනය ආරක්ෂා කරගන්න."
         }
+
+async def broadcast_online_count():
+    count = len(connected_websockets)
+    payload = json.dumps({"type": "online_count", "count": count})
+    for ws in list(connected_websockets):
+        try:
+            if not ws.closed:
+                await ws.send_str(payload)
+        except Exception:
+            connected_websockets.discard(ws)
 
 async def broadcast(item):
     recent_news_cache.append(item)
@@ -793,6 +819,7 @@ async def websocket_handler(request):
     ws = web.WebSocketResponse(heartbeat=20)
     await ws.prepare(request)
     connected_websockets.add(ws)
+    await broadcast_online_count()
     
     if recent_news_cache:
         await ws.send_str(json.dumps(recent_news_cache))
@@ -803,6 +830,7 @@ async def websocket_handler(request):
                 await ws.send_str("pong")
     finally:
         connected_websockets.discard(ws)
+        await broadcast_online_count()
     return ws
 
 async def start_bg(app):
