@@ -26,28 +26,37 @@ recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are an institutional quantitative crypto macro analyst running a tier-1 trading terminal.
-Analyze the given breaking crypto/financial news strictly in fluent, natural Sinhala. Never mention any AI model or provider name.
+SYSTEM_PROMPT = """You are a tier-1 Bitcoin derivatives quant and institutional macro strategist.
+Analyze every breaking crypto/economic headline specifically focusing on its direct transmission mechanism into BITCOIN (BTC).
+Explain strictly in fluent, natural, institutional Sinhala. Never mention any AI system or model names.
 
-Respond strictly in this exact format:
+You MUST follow this exact format:
 TIMING_BANNER: [BREAKING or PRICED_IN]
 IMPACT_TIER: [HIGH or MEDIUM or LOW]
 IMPACT_SCORE: [Number between 1 and 10]/10
 MARKET_BIAS: [BULLISH or BEARISH or NEUTRAL]
-EXPECTED_MOVE: [e.g. ±$200 - $500 or ±$0 - $0]
-TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත or ඉදිරි දින කිහිපය]
+EXPECTED_MOVE: [e.g. ±$600 - $1,500 or ±$0 - $80]
+TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් අවසන් or ඉදිරි දින කිහිපය]
 
 ANALYSIS_BODY:
-• සෘජු බලපෑම (Direct Impact): [කෙටි පැහැදිලි කිරීමක්]
-• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [ආර්ථික හෝ වෙළඳපල පසුබිම]
-• කාලීන අවදානම (Timing & Late-Chasing Trap): [ප්‍රමාද වී trade කිරීමේ අවදානම හෝ signal එක]"""
+• BTC මිලට බලපාන්නේ ඇයි? (Why & Transmission to BTC):
+[මෙම පුවත සාර්ව ආර්ථික (Macro), නියාමන (Regulatory), හෝ Capital Flow මඟින් Bitcoin (BTC) වලට සෘජුව හෝ වක්‍රව සම්ප්‍රේෂණය වන සැබෑ හේතුව පැහැදිලි කරන්න.]
+
+• BTC Orderbook & Liquidity Mechanics (කොහොමද BTC මිල චලනය වෙන්නේ?):
+[Spot CVD (Cumulative Volume Delta), Funding rates, Leverage liquidations (Long/Short squeeze), සහ Orderbook depth එකට සිදුවන යාන්ත්‍රික බලපෑම.]
+
+• BTC Dominance & Capital Rotation (අරමුදල් ගලායාම):
+[Altcoins වලින් BTC වෙත සල්ලි පැමිණීමක්ද, නැතහොත් සමස්ත වෙළඳපලෙන්ම Stablecoins/Cash වෙත පලායාමක්ද?]
+
+• Actionable Setup & Late-Chasing Trap (BTC Trader උපදෙස්):
+[මෙය Fakeout / Bull trap / Bear trap එකක්ද? ක්ෂණික FOMO trade නොගෙන key support/resistance levels හෝ confirmation එනතුරු රැඳී සිටිය යුත්තේ ඇයි?]"""
 
 HTML_UI = """<!DOCTYPE html>
 <html lang="si">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA QUANT // ආයතනික සාර්ව පර්යන්තය</title>
+    <title>ALPHA QUANT // BITCOIN MACRO TERMINAL</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -66,7 +75,7 @@ HTML_UI = """<!DOCTYPE html>
         .logo {
             font-size: 19px;
             font-weight: 800;
-            color: #38bdf8;
+            color: #f59e0b;
             letter-spacing: 1.5px;
             display: flex;
             align-items: center;
@@ -122,7 +131,7 @@ HTML_UI = """<!DOCTYPE html>
             width: 48px;
             height: 48px;
             border: 3px solid #1e293b;
-            border-top: 3px solid #38bdf8;
+            border-top: 3px solid #f59e0b;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -144,7 +153,7 @@ HTML_UI = """<!DOCTYPE html>
             background: #0d121d;
             border: 1px solid #1b2434;
             border-radius: 12px;
-            padding: 22px;
+            padding: 24px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
             animation: fadeIn 0.4s ease-out;
         }
@@ -189,7 +198,7 @@ HTML_UI = """<!DOCTYPE html>
         .tier-MEDIUM { background: #261f0e; color: #fbbf24; border: 1px solid #453313; }
         .tier-HIGH { background: #2d1217; color: #f87171; border: 1px solid #4c1d24; }
         .news-title {
-            font-size: 17px;
+            font-size: 17.5px;
             font-weight: 700;
             color: #ffffff;
             margin-bottom: 18px;
@@ -203,10 +212,14 @@ HTML_UI = """<!DOCTYPE html>
         .metrics-grid {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 9px;
             font-size: 13.5px;
             color: #e2e8f0;
-            margin-bottom: 18px;
+            margin-bottom: 20px;
+            background: #0a0e17;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid #161f30;
         }
         .metric-row {
             display: flex;
@@ -217,36 +230,36 @@ HTML_UI = """<!DOCTYPE html>
             color: #94a3b8;
         }
         .metric-val {
-            font-weight: 600;
+            font-weight: 700;
             color: #f1f5f9;
         }
         .section-title {
-            font-size: 13.5px;
+            font-size: 14px;
             font-weight: 700;
-            color: #cbd5e1;
-            margin-bottom: 12px;
+            color: #f59e0b;
+            margin-bottom: 14px;
             display: flex;
             align-items: center;
             gap: 6px;
         }
         .analysis-text {
-            font-size: 13.5px;
-            line-height: 1.8;
-            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.85;
+            color: #cbd5e1;
             white-space: pre-wrap;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
+        <div class="logo">₿ ALPHA QUANT // BITCOIN TERMINAL</div>
         <div class="live-badge">සජීවී විකාශනය</div>
     </div>
     <div class="grid" id="news-container">
         <div class="waiting-box" id="waiting-placeholder">
             <div class="radar-spinner"></div>
             <div class="waiting-title">📡 සජීවී පුවත් සංග්‍රහය ක්‍රියාත්මකයි...</div>
-            <div class="waiting-sub">ක්ෂණික උණුසුම් පුවතක් හෝ සාර්ව ආර්ථික සංඥාවක් ලැබෙන තුරු රැඳී සිටින්න.</div>
+            <div class="waiting-sub">Bitcoin (BTC) කෙරෙහි සෘජුව බලපාන ප්‍රවෘත්තියක් හෝ ආයතනික සංඥාවක් ලැබෙන තුරු රැඳී සිටින්න.</div>
         </div>
     </div>
     <script>
@@ -268,11 +281,11 @@ HTML_UI = """<!DOCTYPE html>
             const isBreaking = item.timing_status === "BREAKING";
             const bannerClass = isBreaking ? "banner-BREAKING" : "banner-PRICED_IN";
             const bannerText = isBreaking 
-                ? "⚡ උණුසුම් පුවතක් (BREAKING ALPHA): ක්ෂණික වෙළඳපල චලනයක් (High Momentum Setup)" 
-                : "⚠️ දැනටමත් සිදුවී අවසන් (PRICED-IN): වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (Trade එකක් ගන්න එපා - Trap එකක්)";
+                ? "⚡ උණුසුම් පුවතක් (BREAKING ALPHA): ක්ෂණික BTC චලනයක් (High Momentum Setup)" 
+                : "⚠️ දැනටමත් සිදුවී අවසන් (PRICED-IN): වෙළඳපලේ දැනටමත් වෙලා ඉවරයි (BTC Trap එකක්)";
             
             const tier = item.tier || "LOW";
-            const tierLabel = tier === "LOW" ? "● අඩු බලපෑමක් (සාමාන්‍ය පුවතක්)" : (tier === "HIGH" ? "● ප්‍රබල බලපෑමක් (ඉහළ අවධානයක්)" : "● මධ්‍යස්ථ බලපෑමක්");
+            const tierLabel = tier === "LOW" ? "● අඩු බලපෑමක් (NOISE)" : (tier === "HIGH" ? "● ප්‍රබල බලපෑමක් (HIGH ALPHA)" : "● මධ්‍යස්ථ බලපෑමක්");
 
             card.innerHTML = `
                 <div class="banner-row">
@@ -282,12 +295,12 @@ HTML_UI = """<!DOCTYPE html>
                 <div class="news-title">${item.title}</div>
                 <div class="divider"></div>
                 <div class="metrics-grid">
-                    <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score || "2/10"}</span></div>
-                    <div class="metric-row"><span class="metric-label">📊 වෙළඳපල දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias || "NEUTRAL"}</span></div>
+                    <div class="metric-row"><span class="metric-label">📌 BTC බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score || "2/10"}</span></div>
+                    <div class="metric-row"><span class="metric-label">📊 BTC දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias || "NEUTRAL"}</span></div>
                     <div class="metric-row"><span class="metric-label">⚡ අපේක්ෂිත BTC චලනය (Expected Move) :</span> <span class="metric-val">${item.expected_move || "±$0 - $0"}</span></div>
                     <div class="metric-row"><span class="metric-label">⏱️ ක්‍රියාකාරී කාලය (Time Horizon) :</span> <span class="metric-val">${item.horizon || "දැනටමත් සිදුවී ඇත"}</span></div>
                 </div>
-                <div class="section-title">📊 1. ගැඹුරු වෙළඳපල හා Orderbook විශ්ලේෂණය (Deep Microstructure & Macro):</div>
+                <div class="section-title">₿ Bitcoin (BTC) සෘජු සම්ප්‍රේෂණය හා Orderbook විශ්ලේෂණය:</div>
                 <div class="analysis-text">${item.analysis}</div>
             `;
             container.insertBefore(card, container.firstChild);
@@ -319,10 +332,10 @@ async def analyze_news(full_text):
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"News Headline/Text:\n{full_text[:450]}"}
+                {"role": "user", "content": f"Analyze strictly regarding Bitcoin (BTC) impact:\n{full_text[:500]}"}
             ],
             temperature=0.25,
-            max_tokens=1500
+            max_tokens=2200
         )
         raw = completion.choices[0].message.content
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
@@ -358,7 +371,7 @@ async def analyze_news(full_text):
                 
         body_text = "\n".join(analysis_body).strip()
         if not body_text:
-            body_text = "• සෘජු බලපෑම (Direct Impact): සෘජු වෙළඳපල බලපෑමක් නොමැත.\n• ඇයි මෙහෙම වුණේ? (The Fundamental \"Why\"): සාමාන්‍ය ප්‍රකාශයක් පමණි.\n• කාලීන අවදානම (Timing & Late-Chasing Trap): වෙළඳපලට ක්ෂණික අවදානමක් නොමැත."
+            body_text = "• BTC මිලට බලපාන්නේ ඇයි?: සෘජු වෙළඳපල බලපෑමක් නොමැත.\n• යාන්ත්‍රික විග්‍රහය: සාමාන්‍ය ප්‍රකාශයකි."
             
         return timing, tier, score, bias, move, horizon, body_text
     except Exception as e:
