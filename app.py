@@ -39,7 +39,7 @@ async def analyze_news(text):
         return "⚠️ GROQ_API_KEY සකසා නැත."
     try:
         completion = await client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model="qwen/qwen3.8-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Breaking Crypto News:\n{text}"}
