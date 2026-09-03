@@ -9,18 +9,19 @@ from openai import AsyncOpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("CryptoNewsHub")
 
-API_KEY = "sk-ofqwgchmjolsfykjdltswekrkrodgvfpjtfjuivffrcsvjtr"
+API_KEY = "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"
 
 client = AsyncOpenAI(
     api_key=API_KEY,
-    base_url="https://api.siliconflow.cn/v1"
+    base_url="https://api.groq.com/openai/v1"
 )
 
-MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+MODEL_NAME = "llama-3.1-8b-instant"
 
 connected_websockets = set()
 recent_news_cache = []
 seen_titles = set()
+news_queue = asyncio.Queue()
 
 SYSTEM_PROMPT = """You are a senior institutional quantitative crypto analyst.
 Analyze the given breaking crypto/financial news strictly in fluent, natural Sinhala.
@@ -63,14 +64,14 @@ HTML_UI = """<!DOCTYPE html>
 <body>
     <div class="header">
         <div class="title">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (SiliconFlow Qwen)</div>
+        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Llama 3.1)</div>
     </div>
     <div class="grid" id="news-container"></div>
     <script>
-        const container = document.getElementById('news-container');
+        const container = document.getElementById("news-container");
         function addCard(data) {
-            const card = document.createElement('div');
-            card.className = 'card tier-' + (data.tier || 'LOW');
+            const card = document.createElement("div");
+            card.className = "card tier-" + (data.tier || "LOW");
             card.innerHTML = `
                 <div>
                     <span class="badge status-${data.status || 'BREAKING'}">${data.status || 'BREAKING'}</span>
@@ -83,7 +84,7 @@ HTML_UI = """<!DOCTYPE html>
             container.insertBefore(card, container.firstChild);
         }
         function connect() {
-            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const proto = location.protocol === "https:" ? "wss:" : "ws:";
             const ws = new WebSocket(`${proto}//${location.host}/ws`);
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
@@ -121,8 +122,8 @@ async def analyze_news(full_text):
                 remaining.append(line)
         return status, tier, "\n".join(remaining).strip()
     except Exception as e:
-        logger.error(f"SiliconFlow Error: {e}")
-        return "BREAKING", "LOW", f"⚠️ දෝෂයකි: {e}"
+        logger.error(f"Groq API Error: {e}")
+        return "BREAKING", "LOW", f"⚠️ විශ්ලේෂණ දෝෂයකි: {e}"
 
 async def broadcast(item):
     recent_news_cache.append(item)
@@ -133,6 +134,23 @@ async def broadcast(item):
             await ws.send_str(json.dumps(item))
         except Exception:
             connected_websockets.discard(ws)
+
+async def news_worker():
+    while True:
+        raw_news = await news_queue.get()
+        title = raw_news.get("title")
+        status, tier, analysis = await analyze_news(title)
+        payload = {
+            "title": title,
+            "source": raw_news.get("source", "CryptoStream"),
+            "time": raw_news.get("time", 0),
+            "status": status,
+            "tier": tier,
+            "analysis": analysis
+        }
+        await broadcast(payload)
+        news_queue.task_done()
+        await asyncio.sleep(2.1)
 
 async def treeofalpha_stream():
     url = "wss://news.treeofalpha.com/ws"
@@ -151,16 +169,11 @@ async def treeofalpha_stream():
                             if len(seen_titles) > 500:
                                 seen_titles.clear()
                             
-                            status, tier, analysis = await analyze_news(title)
-                            payload = {
+                            await news_queue.put({
                                 "title": title,
-                                "source": raw.get("source", "CryptoStream"),
-                                "time": raw.get("time", 0),
-                                "status": status,
-                                "tier": tier,
-                                "analysis": analysis
-                            }
-                            await broadcast(payload)
+                                "source": raw.get("source", "Tree of Alpha"),
+                                "time": raw.get("time", 0)
+                            })
         except Exception as e:
             logger.error(f"Stream reconnecting: {e}")
             await asyncio.sleep(3)
@@ -182,11 +195,13 @@ async def websocket_handler(request):
     return ws
 
 async def start_background(app):
-    app["task"] = asyncio.create_task(treeofalpha_stream())
+    app["stream_task"] = asyncio.create_task(treeofalpha_stream())
+    app["worker_task"] = asyncio.create_task(news_worker())
 
 async def cleanup_background(app):
-    app["task"].cancel()
-    await app["task"]
+    app["stream_task"].cancel()
+    app["worker_task"].cancel()
+    await asyncio.gather(app["stream_task"], app["worker_task"], return_exceptions=True)
 
 def create_app():
     app = web.Application()
