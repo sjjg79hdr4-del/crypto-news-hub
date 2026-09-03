@@ -470,7 +470,7 @@ HTML_UI = """<!DOCTYPE html>
 
     <script>
         let soundEnabled = true;
-        const alertAudio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"+Array(200).join("C"));
+        let audioCtx = null;
 
         function toggleSound() {
             soundEnabled = !soundEnabled;
@@ -479,6 +479,7 @@ HTML_UI = """<!DOCTYPE html>
                 btn.innerText = "🔊 SOUND: ENABLED";
                 btn.style.borderColor = "#334155";
                 btn.style.color = "#38bdf8";
+                initAudio();
             } else {
                 btn.innerText = "🔇 SOUND: MUTED";
                 btn.style.borderColor = "#991b1b";
@@ -486,35 +487,45 @@ HTML_UI = """<!DOCTYPE html>
             }
         }
 
-        if (window.Notification && Notification.permission !== "granted") {
-            Notification.requestPermission();
+        function initAudio() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch(e) {}
         }
 
-        function playAnyNewsAlert(titleText) {
+        ['click', 'keydown', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                initAudio();
+            }, { once: true });
+        });
+
+        function playSynthAlert() {
             if (!soundEnabled) return;
             try {
-                alertAudio.currentTime = 0;
-                alertAudio.play().catch(e => {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(880, ctx.currentTime);
-                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start();
-                    osc.stop(ctx.currentTime + 0.3);
-                });
+                initAudio();
+                if (!audioCtx) return;
 
-                if (document.hidden && Notification.permission === "granted") {
-                    new Notification("⚡ New Alpha Quant News!", {
-                        body: titleText || "New incoming catalyst detected.",
-                        icon: "https://cryptologos.cc/logos/bitcoin-btc-logo.svg?v=035"
-                    });
-                }
-            } catch(err) {}
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+            } catch(e) {}
         }
 
         const container = document.getElementById("news-container");
@@ -533,7 +544,7 @@ HTML_UI = """<!DOCTYPE html>
             
             if (!isInitialLoad) {
                 card.classList.add("new-incoming");
-                playAnyNewsAlert(d.display_title);
+                playSynthAlert();
             }
 
             const rawBias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
@@ -773,7 +784,7 @@ async def treeofalpha_stream():
                             if len(combined) < 15:
                                 continue
                             
-                            h = generate_text_hash(combined)
+4                            h = generate_text_hash(combined)
                             if h in seen_hashes:
                                 continue
                             seen_hashes.add(h)
@@ -791,7 +802,7 @@ async def treeofalpha_stream():
                                 "time": item_time
                             })
         except Exception as e:
-            logger.error(f5"Stream reconnecting: {e}")
+            logger.error(f"Stream reconnecting: {e}")
             await asyncio.sleep(3)
 
 async def index(request): return web.Response(text=HTML_UI, content_type="text/html")
@@ -824,7 +835,6 @@ async def stop_bg(app):
     await asyncio.gather(app["s"], app["w"], return_exceptions=True)
 
 def create_app():
-    app.app = web.Application() if 'web' in globals() else None
     app = web.Application()
     app.router.add_get("/", index)
     app.router.add_get("/ws", websocket_handler)
