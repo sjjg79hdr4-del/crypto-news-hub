@@ -32,32 +32,31 @@ def generate_text_hash(text):
     clean = re.sub(r'[^a-zA-Z0-9]', '', text.lower())[:80]
     return hashlib.md5(clean.encode()).hexdigest()
 
-SYSTEM_PROMPT = """You are an institutional cryptocurrency quantitative macro strategist.
-Analyze the breaking news/tweet strictly for BITCOIN (BTC) orderflow impact.
+SYSTEM_PROMPT = """You are an elite cryptocurrency market microstructure intelligence terminal and forensic on-chain quant.
+Your job is to conduct an EXHAUSTIVE, DEEP-DIVE FACTUAL BREAKDOWN of the raw incoming news or tweet from beginning to end.
 
-LANGUAGE INSTRUCTIONS:
-- 'summarized_english_title' MUST be in concise English (Max 1 sentence).
-- ALL analysis fields MUST be in natural, professional, trader-level Sinhala.
-- DO NOT use awkward Google-translate terms (e.g. NEVER say 'පිටපත් කිරීමේ අවදානම' for replication/exploit, say 'Exploit / Security අවදානම'; NEVER say 'වගකීම් අඩු කිරීම' for de-risking, say 'Risk management / Capital safety'). Use natural trader Sinhala mixed with quant terms.
+LANGUAGE ENFORCEMENT:
+- 'summarized_english_title': Ultra-sharp, precise English headline capturing the exact development (Max 1 sentence).
+- EVERY OTHER FIELD MUST BE WRITTEN IN DEEP, SOPHISTICATED, NATURAL TRADER SINHALA.
 
-Respond ONLY with a valid JSON object:
+Respond ONLY with a valid JSON object matching this schema:
 {
-  "summarized_english_title": "Short sharp English headline (Max 1 sentence)",
-  "impact_mark": "උදා: 1.5 / 10 — NOISE හෝ 8.0 / 10 — HIGH ALPHA",
+  "summarized_english_title": "Precise English headline detailing the full context",
+  "impact_mark": "උදා: 2.0 / 10 — NOISE හෝ 8.5 / 10 — HIGH ALPHA",
   "directional_bias": "මධ්‍යස්ථ (Neutral) හෝ Bullish හෝ Bearish",
   "expected_move": "නොසැලකිය හැකි (Negligible) හෝ මධ්‍යම ප්‍රමාණයේ චලනයක් හෝ ප්‍රබල චලනයක්",
   "window": "ක්ෂණික තත්පර 60 හෝ කෙටි කාලීන",
   "bias_badge": "NEUTRAL හෝ BULLISH හෝ BEARISH",
   "news_points": [
-    "පුවතේ ප්‍රධාන සිදුවීම පිළිබඳ පැහැදිලි සාරාංශය",
-    "අදාළ සංඛ්‍යාලේඛන හෝ ප්‍රධාන කරුණු",
-    "සිදුවීම පිටුපස ඇති ආයතනික පසුබිම"
+    "පළවූ පුවතේ මුල සිට අගට ඇති සම්පූර්ණ අන්තර්ගතය සහ කියූ නිශ්චිත කරුණු පිළිබඳ ගැඹුරු සිංහල පැහැදිලි කිරීම",
+    "අදාළ සංවිධානය හෝ පුද්ගලයා කවුද සහ මෙම ප්‍රකාශය පිටුපස ඇති තාක්ෂණික හෝ ව්‍යාපාරික පදනම",
+    "මෙම සමස්ත සිදුවීමෙන් සැබවින්ම කියවෙන වෙළඳපල යථාර්ථය සහ අර්ථය"
   ],
-  "core_catalyst": "මෙම පුවත BTC spot/perp මිලට macro catalyst එකක් වන්නේ කෙසේද යන්න කෙටියෙන් හා පැහැදිලිව.",
-  "cvd_orderbook_impact": "Spot CVD වල sell/buy pressure සහ Perp orderbook එකේ limit liquidity හැසිරීම.",
-  "liquidity_traps": "Stop hunt, fake wick හෝ long/short liquidations සිදුවිය හැකි ආකාරය.",
+  "core_catalyst": "මෙම සිදුවීම BTC සාර්ව ආර්ථික ප්‍රාග්ධන ගලනයට සහ Spot වෙළඳපලට බලපාන්නේ කෙසේද යන්න පිළිබඳ විග්‍රහය.",
+  "cvd_orderbook_impact": "Spot CVD වල ආක්‍රමණශීලී මිලදී ගැනීම්/විකිණීම් සහ DOM Orderbook Bid/Ask Limit Walls වල හැසිරීම.",
+  "liquidity_traps": "Perp Open Interest වෙනස්වීම්, Short/Long Stop Hunt අවදානම සහ Fakeout/Sweep විය හැකි කලාප.",
   "verdict": "නොසලකා හරින්න (IGNORE) හෝ NO-TRADE ZONE හෝ LONG BIAS හෝ SHORT BIAS",
-  "action_plan": "Spot CVD divergence සහ orderbook absorption අනුව ගත යුතු කෙටි, පැහැදිලි trading පියවර."
+  "action_plan": "Spot CVD divergence සහ orderbook absorption අනුව ගත යුතු කෙටි trading පියවර සිංහලෙන්."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -168,7 +167,6 @@ HTML_UI = """<!DOCTYPE html>
             border-radius: 6px;
             border: 1px solid #1e293b;
         }
-        
         .grid {
             display: flex;
             flex-direction: column;
@@ -180,6 +178,11 @@ HTML_UI = """<!DOCTYPE html>
             border-radius: 12px;
             padding: 26px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .timing-strip {
             display: flex;
@@ -187,7 +190,7 @@ HTML_UI = """<!DOCTYPE html>
             justify-content: space-between;
             margin-bottom: 16px;
         }
-        .badge-live-breaking {
+        .badge-high-impact {
             background: #4c0519;
             color: #fda4af;
             border: 1px solid #9f1239;
@@ -197,7 +200,7 @@ HTML_UI = """<!DOCTYPE html>
             border-radius: 4px;
             letter-spacing: 0.8px;
         }
-        .badge-archive-recap {
+        .badge-standard-feed {
             background: #1e293b;
             color: #94a3b8;
             border: 1px solid #334155;
@@ -247,7 +250,6 @@ HTML_UI = """<!DOCTYPE html>
         .bias-NEUTRAL { background: #271e11; color: #fbbf24; border: 1px solid #78350f; }
         .bias-BULLISH { background: #064e3b; color: #34d399; border: 1px solid #059669; }
         .bias-BEARISH { background: #451319; color: #f87171; border: 1px solid #991b1b; }
-
         .summarized-title {
             font-size: 18px;
             font-weight: 800;
@@ -275,36 +277,34 @@ HTML_UI = """<!DOCTYPE html>
         .news-summary-box {
             background: #0e1626;
             border-left: 4px solid #38bdf8;
-            padding: 16px 18px;
+            padding: 18px 20px;
             border-radius: 0 8px 8px 0;
             margin-bottom: 22px;
         }
         .news-summary-title {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 900;
             letter-spacing: 1px;
             color: #38bdf8;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .summary-points-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            font-size: 13.5px;
-            line-height: 1.75;
+            gap: 12px;
+            font-size: 14px;
+            line-height: 1.85;
             color: #e2e8f0;
         }
         .summary-points-list div {
             display: flex;
             align-items: flex-start;
-            gap: 8px;
+            gap: 10px;
         }
         .summary-points-list span {
             color: #38bdf8;
             font-weight: 900;
         }
-        
-        /* Structured Analysis Section */
         .analysis-container {
             background: #0c121e;
             border: 1px solid #162032;
@@ -326,13 +326,13 @@ HTML_UI = """<!DOCTYPE html>
             flex-direction: column;
             gap: 12px;
             font-size: 13.5px;
-            line-height: 1.8;
+            line-height: 1.85;
             color: #94a3b8;
         }
         .point-item {
             background: #080d15;
             border-left: 2px solid #2563eb;
-            padding: 10px 14px;
+            padding: 12px 16px;
             border-radius: 0 6px 6px 0;
         }
         .point-label {
@@ -340,8 +340,6 @@ HTML_UI = """<!DOCTYPE html>
             font-weight: 700;
             margin-right: 6px;
         }
-
-        /* Verdict Box */
         .verdict-box {
             background: linear-gradient(180deg, #131a29 0%, #0c121e 100%);
             border: 1px solid #1e293b;
@@ -404,7 +402,7 @@ HTML_UI = """<!DOCTYPE html>
             </div>
             <div class="nav-status-group">
                 <div class="latency-chip">⚡ 12ms EXECUTION</div>
-                <div class="live-chip"><div class="live-dot"></div> FEED SYNCHRONIZED</div>
+                <div class="live-chip" id="status-chip"><div class="live-dot"></div> FEED SYNCHRONIZED</div>
             </div>
         </div>
 
@@ -422,7 +420,13 @@ HTML_UI = """<!DOCTYPE html>
 
     <script>
         const container = document.getElementById("news-container");
+        const renderedIds = new Set();
+
         function addCard(d) {
+            const cardId = d.display_title + (d.card_time || "");
+            if (renderedIds.has(cardId)) return;
+            renderedIds.add(cardId);
+
             const p = document.getElementById("wait-placeholder");
             if (p) p.remove();
 
@@ -432,10 +436,10 @@ HTML_UI = """<!DOCTYPE html>
             const rawBias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
             const biasClass = rawBias.includes("BULL") ? "BULLISH" : (rawBias.includes("BEAR") ? "BEARISH" : "NEUTRAL");
 
-            const isBreaking = d.is_fresh_breaking;
-            const timingBadge = isBreaking 
-                ? `<div class="badge-live-breaking">⚡ BREAKING NEWS</div>`
-                : `<div class="badge-archive-recap">⌛ PRICED-IN / RECAP</div>`;
+            const isHighImpact = d.is_high_impact;
+            const timingBadge = isHighImpact 
+                ? `<div class="badge-high-impact">⚡ HIGH IMPACT BREAKING</div>`
+                : `<div class="badge-standard-feed">📌 STANDARD MACRO FEED</div>`;
 
             let pointsHtml = "";
             if (Array.isArray(d.news_points) && d.news_points.length > 0) {
@@ -467,14 +471,14 @@ HTML_UI = """<!DOCTYPE html>
                 </div>
 
                 <div class="news-summary-box">
-                    <div class="news-summary-title">📢 පුවතේ සාරාංශය (WHAT HAPPENED):</div>
+                    <div class="news-summary-title">📢 පුවතේ සවිස්තරාත්මක විග්‍රහය (FORENSIC EVENT BREAKDOWN):</div>
                     <div class="summary-points-list">
                         ${pointsHtml}
                     </div>
                 </div>
 
                 <div class="analysis-container">
-                    <div class="section-header">● BTC Orderbook & Price Action බලපෑම:</div>
+                    <div class="section-header">● BTC Orderbook & Price Action ගැඹුරු බලපෑම:</div>
                     <div class="points-list">
                         <div class="point-item">
                             <span class="point-label">• Core Catalyst:</span> ${d.core_catalyst}
@@ -497,24 +501,52 @@ HTML_UI = """<!DOCTYPE html>
                         <strong>ක්‍රියාකාරී සැලැස්ම (Action Plan):</strong> ${d.action_plan}
                     </div>
                 </div>
-                <div class="card-time">${new Date().toLocaleTimeString()}</div>
+                <div class="card-time">${d.card_time || new Date().toLocaleTimeString()}</div>
             `;
             container.insertBefore(card, container.firstChild);
         }
 
-        const proto = location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${proto}//${location.host}/ws`);
-        ws.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (Array.isArray(data)) { data.forEach(addCard); }
-            else { addCard(data); }
-        };
+        let ws;
+        function connect() {
+            const proto = location.protocol === "https:" ? "wss:" : "ws:";
+            ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+            ws.onopen = () => {
+                document.getElementById("status-chip").innerHTML = '<div class="live-dot"></div> FEED SYNCHRONIZED';
+            };
+
+            ws.onmessage = (e) => {
+                if (e.data === "pong") return;
+                try {
+                    const data = JSON.parse(e.data);
+                    if (Array.isArray(data)) { data.forEach(addCard); }
+                    else { addCard(data); }
+                } catch(err) {}
+            };
+
+            ws.onclose = () => {
+                document.getElementById("status-chip").innerHTML = '<div class="live-dot" style="background:#ef4444;box-shadow:none;"></div> RECONNECTING...';
+                setTimeout(connect, 1500);
+            };
+
+            ws.onerror = () => { ws.close(); };
+        }
+        connect();
+
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send("ping");
+            }
+        }, 15000);
     </script>
 </body>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze breaking crypto headline for BTC Orderflow and DOM execution. ALL analysis must be exclusively in natural, trader-grade Sinhala:\n\n{text[:3500]}"
+    prompt_payload = f"""CRITICAL DIRECTIVE: Perform an in-depth forensic breakdown of this raw incoming post/news. Read every single sentence and explain what the entity is actually doing and saying in full Sinhala depth:
+
+RAW SOURCE CONTENT:
+\"\"\"{text}\"\"\""""
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -523,37 +555,41 @@ async def analyze_news(text):
                 {"role": "user", "content": prompt_payload}
             ],
             response_format={"type": "json_object"},
-            temperature=0.1,
-            max_tokens=1800
+            temperature=0.15,
+            max_tokens=2200
         )
         return json.loads(completion.choices[0].message.content)
     except Exception as e:
         logger.error(f"Analysis error: {e}")
         return {
             "summarized_english_title": text[:90] + "...",
-            "impact_mark": "1.5 / 10 — NOISE",
+            "impact_mark": "2.0 / 10 — NOISE",
             "directional_bias": "මධ්‍යස්ථ (Neutral)",
             "expected_move": "නොසැලකිය හැකි (Negligible)",
             "window": "ක්ෂණික තත්පර 60",
             "bias_badge": "NEUTRAL",
             "news_points": [
-                "සාමාන්‍ය පුවතක් හෝ ප්‍රකාශනයක් වාර්තා වී ඇත.",
-                "ක්ෂණික ප්‍රතිපත්ති හෝ අරමුදල් ගලායාමේ වෙනසක් නොමැත.",
-                "Bitcoin මිලට සෘජු ආයතනික බලපෑමක් ඇති නොකරයි."
+                f"වාර්තා වූ සැබෑ අන්තර්ගතය: {text[:250]}",
+                "අදාළ ආයතනය මඟින් සිදු කර ඇති නිවේදනය පිළිබඳ මූලික පසුබිම් විග්‍රහය.",
+                "මෙම පුවත සාර්ව ආර්ථික වශයෙන් Bitcoin වෙත ප්‍රාග්ධනය ආකර්ෂණය කිරීමට සමත් නොවන බව තහවුරු වේ."
             ],
-            "core_catalyst": "මෙය Bitcoin සඳහා macro catalyst එකක් නොවන සාමාන්‍ය noise පුවතකි.",
-            "cvd_orderbook_impact": "Spot CVD සහ DOM bid/ask liquidity වල කිසිදු කැපී පෙනෙන වෙනසක් නොමැත.",
-            "liquidity_traps": "ලික්විඩේෂන් හෝ fake wick අවදානමක් නොමැත.",
+            "core_catalyst": "මෙම සිදුවීම මඟින් Bitcoin වෙළඳපලට ආයතනික හෝ structural ප්‍රාග්ධන ගලනයක් සිදු නොවන බැවින් සාර්ව catalyst එකක් නොවේ.",
+            "cvd_orderbook_impact": "Spot CVD වල කැපී පෙනෙන මිලදී ගැනීමේ හෝ විකිණීමේ delta එකක් නිර්මාණය නොවන අතර DOM limit liquidity ස්ථාවරව පවතී.",
+            "liquidity_traps": "Perp Open Interest හි අස්වාභාවික වැඩිවීමක් නොමැත බැවින් cascade liquidations හෝ stop hunt අවදානමක් නැත.",
             "verdict": "නොසලකා හරින්න (IGNORE)",
             "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැති බැවින් trade නොගෙන ප්‍රාග්ධනය ආරක්ෂා කරගන්න."
         }
 
 async def broadcast(item):
     recent_news_cache.append(item)
-    if len(recent_news_cache) > 30: recent_news_cache.pop(0)
+    if len(recent_news_cache) > 40: recent_news_cache.pop(0)
+    msg_str = json.dumps(item)
     for ws in list(connected_websockets):
-        try: await ws.send_str(json.dumps(item))
-        except: connected_websockets.discard(ws)
+        try: 
+            if not ws.closed:
+                await ws.send_str(msg_str)
+        except Exception: 
+            connected_websockets.discard(ws)
 
 async def news_worker():
     while True:
@@ -563,20 +599,26 @@ async def news_worker():
         item_time = raw_news.get("time", time.time() * 1000)
         
         now_ms = time.time() * 1000
-        is_fresh = (now_ms - item_time) < (120 * 1000) if item_time > 0 else True
-
-        if body and body != full_title:
-            content = f"Headline: {full_title}\nBody/Details: {body}"
-        else:
-            content = full_title
+        is_fresh = (now_ms - item_time) < (90 * 1000) if item_time > 0 else False
             
-        res = await analyze_news(content)
+        res = await analyze_news(content := (f"Headline: {full_title}\nBody/Details: {body}" if body and body != full_title else full_title))
+        
+        impact_str = res.get("impact_mark", "2.0")
+        impact_num = 2.0
+        try:
+            match = re.search(r'([\d\.]+)', impact_str)
+            if match:
+                impact_num = float(match.group(1))
+        except:
+            pass
+
+        is_high_impact = is_fresh and (impact_num >= 7.0)
         display_title = res.get("summarized_english_title") or full_title
         
         payload = {
             "display_title": display_title,
-            "is_fresh_breaking": is_fresh,
-            "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
+            "is_high_impact": is_high_impact,
+            "impact_mark": res.get("impact_mark", "2.0 / 10 — NOISE"),
             "directional_bias": res.get("directional_bias", "මධ්‍යස්ථ (Neutral)"),
             "expected_move": res.get("expected_move", "නොසැලකිය හැකි (Negligible)"),
             "window": res.get("window", "ක්ෂණික තත්පර 60"),
@@ -586,19 +628,20 @@ async def news_worker():
             "cvd_orderbook_impact": res.get("cvd_orderbook_impact", ""),
             "liquidity_traps": res.get("liquidity_traps", ""),
             "verdict": res.get("verdict", "නොසලකා හරින්න (IGNORE)"),
-            "action_plan": res.get("action_plan", "")
+            "action_plan": res.get("action_plan", ""),
+            "card_time": time.strftime("%H:%M:%S")
         }
         await broadcast(payload)
         news_queue.task_done()
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
 
 async def treeofalpha_stream():
     url = "wss://news.treeofalpha.com/ws"
     while True:
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(url) as ws:
-                    logger.info("Connected to news stream")
+                async with session.ws_connect(url, heartbeat=20) as ws:
+                    logger.info("Connected to news websocket stream")
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             raw = json.loads(msg.data)
@@ -634,13 +677,19 @@ async def treeofalpha_stream():
 async def index(request): return web.Response(text=HTML_UI, content_type="text/html")
 
 async def websocket_handler(request):
-    ws = web.WebSocketResponse()
+    ws = web.WebSocketResponse(heartbeat=20)
     await ws.prepare(request)
     connected_websockets.add(ws)
-    if recent_news_cache: await ws.send_str(json.dumps(recent_news_cache))
+    
+    if recent_news_cache:
+        await ws.send_str(json.dumps(recent_news_cache))
+        
     try:
-        async for msg in ws: pass
-    finally: connected_websockets.discard(ws)
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.TEXT and msg.data == "ping":
+                await ws.send_str("pong")
+    finally:
+        connected_websockets.discard(ws)
     return ws
 
 async def start_bg(app):
