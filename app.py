@@ -26,21 +26,22 @@ recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are an institutional macro quantitative analyst.
-Analyze breaking crypto/financial news strictly in fluent, natural Sinhala. Never mention any AI identity.
+SYSTEM_PROMPT = """You are an institutional macro quantitative analyst and crypto trader.
+Analyze the provided full news headline, full tweet/article text, and source strictly in fluent, natural, institutional Sinhala.
+Read the ACTUAL content of the tweet/news carefully. Do NOT give generic robotic answers. Explain specifically based on what is actually stated in the text.
 
-Strictly format output as:
+Strictly format your response as:
 TIMING_BANNER: [BREAKING or PRICED_IN]
 IMPACT_TIER: [HIGH or MEDIUM or LOW]
-IMPACT_SCORE: [1-10]/10
+IMPACT_SCORE: [Number 1-10]/10
 MARKET_BIAS: [BULLISH or BEARISH or NEUTRAL]
-EXPECTED_MOVE: [e.g. ±$500 - $1,000 or ±$0 - $0]
-TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත or ඉදිරි සති කිහිපය]
+EXPECTED_MOVE: [e.g. ±$300 - $800 or ±$0 - $50]
+TIME_HORIZON: [e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් අවසන් or ඉදිරි දින කිහිපය]
 
 ANALYSIS_BODY:
-• සෘජු බලපෑම (Direct Impact): [පැහැදිලි කෙටි විග්‍රහයක්]
-• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [ආර්ථික හා නියාමන පසුබිම]
-• කාලීන අවදානම (Timing & Late-Chasing Trap): [වෙළඳපල අවදානම හෝ signal තත්ත්වය]"""
+• සෘජු බලපෑම (Direct Impact): [මෙම tweet/news එකේ සඳහන් කරුණු කෙළින්ම crypto/BTC වෙළඳපලට බලපාන්නේ කෙසේදැයි විස්තර කරන්න]
+• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): [මූලාශ්‍රය (Source) සහ tweet එකේ කියන සිදුවීම පිටුපස ඇති සැබෑ ආර්ථික, නීතිමය හෝ දේශපාලන පසුබිම]
+• කාලීන අවදානම (Timing & Late-Chasing Trap): [වෙළඳපල දැනටමත් මේකට react කරලා ඉවරද, නැත්නම් අලුතින් trap එකක් හැදෙනවද යන්න]"""
 
 HTML_UI = """<!DOCTYPE html>
 <html lang="si">
@@ -154,7 +155,7 @@ HTML_UI = """<!DOCTYPE html>
             justify-content: space-between;
             align-items: center;
             gap: 14px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         .banner-box {
             flex: 1;
@@ -185,12 +186,31 @@ HTML_UI = """<!DOCTYPE html>
         .tier-MEDIUM { background: #261f0e; color: #fbbf24; border: 1px solid #78350f; }
         .tier-HIGH { background: #2d1217; color: #f87171; border: 1px solid #7f1d1d; }
         
+        .source-tag {
+            font-size: 12px;
+            color: #38bdf8;
+            font-weight: 700;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
         .news-title {
             font-size: 17px;
             font-weight: 700;
             color: #ffffff;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
             line-height: 1.5;
+        }
+        .tweet-body-box {
+            background: #090d16;
+            border-left: 3px solid #38bdf8;
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.5;
+            margin-bottom: 18px;
+            border-radius: 0 4px 4px 0;
+            white-space: pre-wrap;
         }
         .divider {
             height: 1px;
@@ -272,12 +292,18 @@ HTML_UI = """<!DOCTYPE html>
             const tier = item.tier || "LOW";
             const tierLabel = tier === "LOW" ? "● LOW (NOISE)" : (tier === "HIGH" ? "● HIGH (ALPHA)" : "● MEDIUM (WATCH)");
 
+            const tweetHtml = (item.raw_body && item.raw_body !== item.title) 
+                ? `<div class="tweet-body-box">💬 ${item.raw_body}</div>` 
+                : "";
+
             card.innerHTML = `
                 <div class="banner-row">
                     <div class="banner-box ${bannerClass}">${bannerText}</div>
                     <div class="tier-pill tier-${tier}">${tierLabel}</div>
                 </div>
+                <div class="source-tag">📌 SOURCE: ${item.source || "Tree News"}</div>
                 <div class="news-title">${item.title}</div>
+                ${tweetHtml}
                 <div class="divider"></div>
                 <div class="metrics-grid">
                     <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score || "2 / 10"}</span></div>
@@ -311,13 +337,14 @@ HTML_UI = """<!DOCTYPE html>
 </body>
 </html>"""
 
-async def analyze_news(full_text):
+async def analyze_news(title, body, source):
     try:
+        combined_content = f"Source: {source}\nHeadline: {title}\nFull Text/Tweet: {body}"
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Analyze headline:\n{full_text[:450]}"}
+                {"role": "user", "content": f"Analyze this specific breaking news deeply:\n{combined_content[:1500]}"}
             ],
             temperature=0.2,
             max_tokens=1500
@@ -355,9 +382,6 @@ async def analyze_news(full_text):
                 analysis_body.append(line)
                 
         body_text = "\n".join(analysis_body).strip()
-        if not body_text:
-            body_text = "• සෘජු බලපෑම (Direct Impact): BTC මිලට ක්ෂණිකව බලපාන සෘජු බලපෑමක් නොමැත.\n• ඇයි මෙහෙම වුණේ? (The Fundamental \"Why\"): මෙම ප්‍රකාශය අතිරේක සාකච්ඡාවක් වන අතර, නව ප්‍රතිපත්තියක් හෝ නීතිමය වෙනස්කමක් නොමැති බැවින්, මූල්‍යමය හෝ ආර්ථිකමය බලපෑමක් නොමැත.\n• කාලීන අවදානම (Timing & Late-Chasing Trap): දේශපාලන කතාබහක් වශයෙන්, BTC වෙළඳපලට අධික අවදානමක් නැත. නමුත්, නව ප්‍රතිපත්තියක් හෝ නීතිමය වෙනස්කමක් එන විට, සමාජ මාධ්‍ය හරහා හදිසි සංකේතයක් (signal) ඇති විය හැකිය."
-            
         return timing, tier, score, bias, move, horizon, body_text
     except Exception as e:
         logger.error(f"Analysis error: {e}")
@@ -376,10 +400,15 @@ async def broadcast(item):
 async def news_worker():
     while True:
         raw_news = await news_queue.get()
-        title = raw_news.get("title")
-        timing, tier, score, bias, move, horizon, analysis = await analyze_news(title)
+        title = raw_news.get("title", "")
+        body = raw_news.get("body", "")
+        source = raw_news.get("source", "Tree of Alpha")
+        
+        timing, tier, score, bias, move, horizon, analysis = await analyze_news(title, body, source)
         payload = {
             "title": title,
+            "raw_body": body,
+            "source": source,
             "time": raw_news.get("time", 0),
             "timing_status": timing,
             "tier": tier,
@@ -403,15 +432,21 @@ async def treeofalpha_stream():
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             raw = json.loads(msg.data)
-                            title = (raw.get("title") or raw.get("body", "") or "").strip()
-                            if not title or len(title) < 15 or title in seen_titles:
+                            title = (raw.get("title") or "").strip()
+                            body = (raw.get("body") or raw.get("content") or "").strip()
+                            source = raw.get("source") or "Tree of Alpha"
+                            
+                            main_text = title if title else body
+                            if not main_text or len(main_text) < 15 or main_text in seen_titles:
                                 continue
-                            seen_titles.add(title)
+                            seen_titles.add(main_text)
                             if len(seen_titles) > 500:
                                 seen_titles.clear()
                             
                             await news_queue.put({
-                                "title": title,
+                                "title": title if title else body[:120] + "...",
+                                "body": body if body else title,
+                                "source": source,
                                 "time": raw.get("time", 0)
                             })
         except Exception as e:
