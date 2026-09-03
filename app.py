@@ -9,8 +9,7 @@ from openai import AsyncOpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("CryptoNewsHub")
 
-# Direct Hardcoded API Key to bypass Railway Variable whitespace bugs
-API_KEY = "sk-pelmrylphluuoklrexttdcsvmnshpklddvzecrcmfzbbzthu"
+API_KEY = "sk-ofqwgchmjolsfykjdltswekrkrodgvfpjtfjuivffrcsvjtr"
 
 client = AsyncOpenAI(
     api_key=API_KEY,
