@@ -1,8 +1,11 @@
 import os
+import re
+import time
 import json
 import asyncio
 import logging
 import base64
+import hashlib
 import aiohttp
 from aiohttp import web
 from openai import AsyncOpenAI
@@ -22,37 +25,38 @@ MODEL_NAME = "openai/gpt-oss-20b"
 
 connected_websockets = set()
 recent_news_cache = []
-seen_titles = set()
+seen_hashes = set()
 news_queue = asyncio.Queue()
+
+def generate_text_hash(text):
+    clean = re.sub(r'[^a-zA-Z0-9]', '', text.lower())[:80]
+    return hashlib.md5(clean.encode()).hexdigest()
 
 SYSTEM_PROMPT = """You are an institutional cryptocurrency quantitative macro strategist.
 Carefully read the ENTIRE content of the breaking news or tweet.
-1. Create a CONCISE, PUNCHY ENGLISH HEADLINE (summarized_english_title) summarizing the core event in English. Max 1-2 sharp sentences.
-2. Provide a 3-bullet-point Sinhala summary of the news itself (news_points):
-   - Point 1: සැබවින්ම සිදුවූයේ කුමක්ද (What happened)
-   - Point 2: අදාළ ප්‍රධාන සංඛ්‍යාලේඛන හෝ ප්‍රකාශ (Key data/facts/figures)
-   - Point 3: ඒ පිටුපස ඇති පසුබිම (Context/Background)
+1. Create a CONCISE, PUNCHY ENGLISH HEADLINE (summarized_english_title) summarizing the core event in English (Max 1 sentence).
+2. Provide a 3-bullet-point Sinhala summary of the news itself (news_points).
 3. Analyze how this specifically impacts BITCOIN (BTC) spot/perp markets, liquidity, and orderbook.
-Write ALL explanations, summaries, descriptions, Verdict, and Action Plan strictly in fluent, natural, institutional Sinhala.
+4. Action plan MUST be ultra-short (under 20 words), focusing on Spot CVD, DOM absorption, and Orderbook walls.
 
-Respond strictly with a valid JSON object matching this schema:
+Respond ONLY with a valid JSON object:
 {
-  "summarized_english_title": "Short, sharp English headline (e.g. Band Protocol Reports Record $406M DeFi Exploits in Q2 2026)",
-  "impact_mark": "උදා: 1.5 / 10 — NOISE හෝ 8.5 / 10 — CRITICAL ALPHA",
-  "directional_bias": "NEUTRAL හෝ BULLISH හෝ BEARISH",
-  "expected_move": "±$0-$50 හෝ ±$500-$1,200",
-  "window": "ක්ෂණික තත්පර 60 තුළ හෝ විනාඩි 5-15 තුළ හෝ පැය 1-4 තුළ",
+  "summarized_english_title": "Short sharp English headline",
+  "impact_mark": "උදා: 1.5 / 10 — NOISE හෝ 8.0 / 10 — HIGH ALPHA",
+  "directional_bias": "මධ්‍යස්ථ (Neutral) හෝ Bullish හෝ Bearish",
+  "expected_move": "±$0-$50 හෝ ±$400-$1,000",
+  "window": "ක්ෂණික තත්පර 60 හෝ පැය 1-4",
   "bias_badge": "NEUTRAL හෝ BULLISH හෝ BEARISH",
   "news_points": [
-    "සිදුවීම පිළිබඳ පළමු පැහැදිලි කිරීම",
-    "අදාළ ප්‍රධාන දත්ත හෝ සංඛ්‍යා ලේඛන",
-    "සිදුවීමට අදාළ පසුබිම හෝ අරමුණ"
+    "පුවතේ ප්‍රධානම සිදුවීම",
+    "අදාළ ප්‍රධාන දත්ත/තොරතුරු",
+    "සිදුවීමේ මූලික පසුබිම"
   ],
-  "core_catalyst": "මෙම පුවතේ සඳහන් කරුණු BTC වලට සෘජු macro/structural catalyst එකක් වන්නේ ඇයි/නොවන්නේ ඇයිද යන්න සවිස්තරාත්මකව.",
-  "cvd_orderbook_impact": "Spot CVD (Cumulative Volume Delta), Orderbook bid/ask walls, Aggressive market orders සහ DXY සම්බන්ධතාවයට වන බලපෑම.",
-  "liquidity_traps": "Short/Long liquidations, Fake Wick අවදානම සහ Liquidity Hunt/Sweep එකක් සිදුවිය හැකි ආකාරය.",
-  "verdict": "නොසලකා හරින්න (IGNORE) හෝ LONG BIAS හෝ SHORT BIAS හෝ තහවුරු වන තුරු රැඳී සිටින්න (WAIT)",
-  "action_plan": "Bitcoin traders ලා 1m/5m timeframe තුළ ගත යුතු නිශ්චිත ක්‍රියාමාර්ගය, Invalidation මට්ටම් සහ perp funding rates නිරීක්ෂණය කළ යුතු ආකාරය පිරිසිදු සිංහලෙන්."
+  "core_catalyst": "BTC මිලට macro catalyst එකක් වෙනවද නැද්ද යන්න කෙටියෙන්.",
+  "cvd_orderbook_impact": "Spot CVD සහ Perp orderbook එකට වෙන සැබෑ බලපෑම.",
+  "liquidity_traps": "Liquidation traps, fakeout හෝ stop hunt අවදානම.",
+  "verdict": "නොසලකා හරින්න (IGNORE) හෝ NO-TRADE ZONE හෝ LONG BIAS හෝ SHORT BIAS",
+  "action_plan": "Spot CVD සහ DOM bid/ask absorption මත පදනම් වූ වචන 15-20 ක කෙටිම උපදෙස."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -139,6 +143,35 @@ HTML_UI = """<!DOCTYPE html>
             padding: 26px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
         }
+        .timing-strip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .badge-live-breaking {
+            background: #4c0519;
+            color: #fda4af;
+            border: 1px solid #9f1239;
+            font-size: 11px;
+            font-weight: 900;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .badge-archive-recap {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.8px;
+        }
         .impact-hero {
             display: flex;
             justify-content: space-between;
@@ -213,9 +246,6 @@ HTML_UI = """<!DOCTYPE html>
             letter-spacing: 1px;
             color: #38bdf8;
             margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
         .summary-points-list {
             display: flex;
@@ -253,8 +283,10 @@ HTML_UI = """<!DOCTYPE html>
             color: #e2e8f0;
         }
         .verdict-box {
-            border-top: 1px solid #1a2333;
-            padding-top: 16px;
+            background: #131b2a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 16px 18px;
             font-size: 14px;
             line-height: 1.8;
         }
@@ -318,6 +350,11 @@ HTML_UI = """<!DOCTYPE html>
             const rawBias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
             const biasClass = rawBias.includes("BULL") ? "BULLISH" : (rawBias.includes("BEAR") ? "BEARISH" : "NEUTRAL");
 
+            const isBreaking = d.is_fresh_breaking;
+            const timingBadge = isBreaking 
+                ? `<div class="badge-live-breaking">⚡ BREAKING NEWS</div>`
+                : `<div class="badge-archive-recap">⌛ PRICED-IN / RECAP</div>`;
+
             let pointsHtml = "";
             if (Array.isArray(d.news_points) && d.news_points.length > 0) {
                 pointsHtml = d.news_points.map(pt => `<div><span>•</span> <div>${pt}</div></div>`).join("");
@@ -326,6 +363,11 @@ HTML_UI = """<!DOCTYPE html>
             }
 
             card.innerHTML = `
+                <div class="timing-strip">
+                    ${timingBadge}
+                    <div style="font-size:11px; color:#64748b;">${d.source || 'TREE NEWS'}</div>
+                </div>
+
                 <div class="impact-hero">
                     <div class="impact-hero-left">
                         <div class="impact-label">📌 IMPACT SCORE & EVALUATION</div>
@@ -348,7 +390,7 @@ HTML_UI = """<!DOCTYPE html>
                     </div>
                 </div>
 
-                <div class="section-header">● BTC Orderbook & Price Action බලපෑම (සාරාංශය):</div>
+                <div class="section-header">● BTC Orderbook & Price Action බලපෑම:</div>
                 <div class="points-list">
                     <div>• <strong>Core Catalyst:</strong> ${d.core_catalyst}</div>
                     <div>• <strong>Orderbook & CVD Impact:</strong> ${d.cvd_orderbook_impact}</div>
@@ -379,7 +421,7 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze the full content of this breaking news/tweet. Create a concise summarized English headline, 3 Sinhala bullet points of what happened, and analyze BTC impact in Sinhala:\n\n{text[:3500]}"
+    prompt_payload = f"Analyze breaking crypto headline for BTC Orderflow and DOM execution:\n\n{text[:3500]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -388,29 +430,29 @@ async def analyze_news(text):
                 {"role": "user", "content": prompt_payload}
             ],
             response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=2000
+            temperature=0.15,
+            max_tokens=1800
         )
         return json.loads(completion.choices[0].message.content)
     except Exception as e:
         logger.error(f"Analysis error: {e}")
         return {
-            "summarized_english_title": text[:100] + "...",
+            "summarized_english_title": text[:90] + "...",
             "impact_mark": "1.5 / 10 — NOISE",
             "directional_bias": "මධ්‍යස්ථ (Neutral)",
             "expected_move": "±$0-$50",
-            "window": "ක්ෂණික තත්පර 60 තුළ",
+            "window": "ක්ෂණික තත්පර 60",
             "bias_badge": "NEUTRAL",
             "news_points": [
-                "සාමාන්‍ය වෙළඳපල හෝ දේශපාලන ප්‍රකාශනයක් වාර්තා වී ඇත.",
-                "ක්ෂණික මූල්‍යමය හෝ ආර්ථික ප්‍රතිපත්ති වෙනසක් මෙහි අඩංගු නොවේ.",
-                "වෙළඳපලට සෘජු ආයතනික හෝ නීතිමය බලපෑමක් නොමැත."
+                "සාමාන්‍ය වෙළඳපල හෝ දේශපාලන ප්‍රකාශනයකි.",
+                "ක්ෂණික ප්‍රතිපත්ති හෝ අරමුදල් ගලායාමේ වෙනසක් නොමැත.",
+                "Bitcoin මිලට සෘජු බලපෑමක් ඇති නොකරයි."
             ],
-            "core_catalyst": "Bitcoin (BTC) මිල කෙරෙහි ක්ෂණික සාර්ව ආර්ථික (macro) බලපෑමක් ඇති කිරීමට තරම් ප්‍රබල catalyst එකක් නොවේ.",
-            "cvd_orderbook_impact": "Spot CVD වල කැපී පෙනෙන වෙනසක් නොමැත. ආක්‍රමණශීලී මිලදී ගැනීම් හෝ විකිණීම් වාර්තා නොවන අතර DXY මධ්‍යස්ථව පවතී.",
-            "liquidity_traps": "Short හෝ Long liquidation cascades සඳහා අවස්ථාවක් නොමැත. Fake Wick හෝ Liquidity Hunt අවදානමක් නොමැත.",
+            "core_catalyst": "මෙය macro catalyst එකක් නොවන සාමාන්‍ය noise පුවතකි.",
+            "cvd_orderbook_impact": "Spot CVD සහ DOM bid/ask liquidity වල වෙනසක් නැත.",
+            "liquidity_traps": "ලික්විඩේෂන් හෝ fake wick අවදානමක් නොමැත.",
             "verdict": "නොසලකා හරින්න (IGNORE)",
-            "action_plan": "Bitcoin traders ලා 1m හෝ 5m timeframe තුළ මෙම පුවත මත පදනම්ව හදිසි entries නොගත යුතුය. සුපුරුදු BTC/USD spot liquidity මට්ටම් සහ perp funding rates පිළිබඳව පමණක් අවධානයෙන් සිටින්න."
+            "action_plan": "Spot CVD සහ DOM එකේ වෙනසක් නැත. Market orders දැමීමෙන් වළකින්න (No trade)."
         }
 
 async def broadcast(item):
@@ -425,9 +467,14 @@ async def news_worker():
         raw_news = await news_queue.get()
         full_title = raw_news.get("full_title", "")
         body = raw_news.get("body", "")
+        source = raw_news.get("source", "Tree News")
+        item_time = raw_news.get("time", time.time() * 1000)
         
+        now_ms = time.time() * 1000
+        is_fresh = (now_ms - item_time) < (120 * 1000) if item_time > 0 else True
+
         if body and body != full_title:
-            content = f"Title: {full_title}\nFull Tweet/Content Body: {body}"
+            content = f"Headline: {full_title}\nBody/Details: {body}"
         else:
             content = full_title
             
@@ -436,10 +483,12 @@ async def news_worker():
         
         payload = {
             "display_title": display_title,
+            "source": source,
+            "is_fresh_breaking": is_fresh,
             "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
             "directional_bias": res.get("directional_bias", "මධ්‍යස්ථ (Neutral)"),
             "expected_move": res.get("expected_move", "±$0-$50"),
-            "window": res.get("window", "ක්ෂණික තත්පර 60 තුළ"),
+            "window": res.get("window", "ක්ෂණික තත්පර 60"),
             "bias_badge": res.get("bias_badge", "NEUTRAL"),
             "news_points": res.get("news_points", []),
             "core_catalyst": res.get("core_catalyst", ""),
@@ -464,20 +513,30 @@ async def treeofalpha_stream():
                             raw = json.loads(msg.data)
                             title = (raw.get("title") or "").strip()
                             body = (raw.get("body") or raw.get("content") or "").strip()
+                            source = raw.get("source") or "Tree of Alpha"
+                            item_time = raw.get("time") or (time.time() * 1000)
+                            
+                            combined = f"{title} {body}".strip()
+                            if len(combined) < 15:
+                                continue
+                            
+                            h = generate_text_hash(combined)
+                            if h in seen_hashes:
+                                continue
+                            seen_hashes.add(h)
+                            if len(seen_hashes) > 2000:
+                                seen_hashes.clear()
                             
                             if title and body and title not in body:
                                 full_title = f"{title}: {body}"
                             else:
                                 full_title = title if title else body
                             
-                            if not full_title or len(full_title) < 15 or full_title in seen_titles:
-                                continue
-                            seen_titles.add(full_title)
-                            if len(seen_titles) > 500: seen_titles.clear()
-                            
                             await news_queue.put({
                                 "full_title": full_title,
-                                "body": body
+                                "body": body,
+                                "source": source,
+                                "time": item_time
                             })
         except Exception as e:
             logger.error(f"Stream reconnecting: {e}")
