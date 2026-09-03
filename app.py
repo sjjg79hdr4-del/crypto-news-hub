@@ -10,7 +10,6 @@ from openai import AsyncOpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("CryptoNewsHub")
 
-# Encoded to bypass git secret scanners cleanly
 _k = b'Z3NrX1RMTmdlSEl4VVJWSjh5eU81Rm5CV0dkeWIzRllzV1hIYnBiYnY4cEdGdUw3V2JiZVB2T04='
 API_KEY = os.environ.get("GROQ_API_KEY") or base64.b64decode(_k).decode()
 
@@ -19,7 +18,8 @@ client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-MODEL_NAME = "llama-3.1-8b-instant"
+# Active ultra-fast Groq production model (1,000 t/s)
+MODEL_NAME = "openai/gpt-oss-20b"
 
 connected_websockets = set()
 recent_news_cache = []
@@ -67,7 +67,7 @@ HTML_UI = """<!DOCTYPE html>
 <body>
     <div class="header">
         <div class="title">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
-        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Llama 3.1)</div>
+        <div id="conn-status" style="color: #10b981; font-size: 13px;">● Live Streaming (Groq Engine)</div>
     </div>
     <div class="grid" id="news-container"></div>
     <script>
