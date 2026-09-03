@@ -26,21 +26,23 @@ seen_titles = set()
 news_queue = asyncio.Queue()
 
 SYSTEM_PROMPT = """You are an institutional cryptocurrency quantitative macro strategist.
-Analyze the provided breaking news/tweet strictly for BITCOIN (BTC) spot/perp trading.
-Output fluent, professional institutional Sinhala (with standard quant English terms like Spot CVD, Orderbook, Liquidity Sweep, Fake Wick).
+Carefully read the ENTIRE content of the breaking news or tweet (stats, body text, figures, claims).
+Analyze how this specifically impacts BITCOIN (BTC) spot/perp markets, liquidity, and orderbook.
+Write ALL descriptions, explanations, Verdict, and Action Plan strictly in fluent, natural, institutional Sinhala (standard quant terms like CVD, Orderbook, Liquidity Sweep are acceptable).
+DO NOT OUTPUT ANY ENGLISH IN THE VERDICT OR ACTION PLAN.
 
-Respond ONLY with a valid JSON object matching this schema:
+Respond strictly with a valid JSON object matching this schema:
 {
-  "impact_mark": "e.g. 1.5 / 10 — NOISE or 8.5 / 10 — CRITICAL ALPHA",
-  "directional_bias": "NEUTRAL or BULLISH or BEARISH",
-  "expected_move": "±$0-$50",
-  "window": "Immediate 60s or 5m-15m or 1h-4h",
-  "bias_badge": "NEUTRAL or BULLISH or BEARISH",
-  "core_catalyst": "මෙම පුවත/වාර්තාව කුමක්ද සහ BTC වලට macro/structural catalyst එකක් වන්නේ ඇයි/නොවන්නේ ඇයිද යන්න.",
-  "cvd_orderbook_impact": "Spot CVD (Cumulative Volume Delta) වලට සිදුවන බලපෑම, aggressive buyers/sellers ක්‍රියාකාරීත්වය සහ DXY correlation තත්ත්වය.",
-  "liquidity_traps": "Short/Long liquidation cascades, Fake Wick අවදානම හෝ liquidity sweep සිදුවන ආකාරය.",
-  "verdict": "IGNORE or LONG BIAS or SHORT BIAS or WAIT FOR CONFIRMATION",
-  "action_plan": "Bitcoin traders ලා 1m/5m timeframe තුළ ගත යුතු ක්‍රියාමාර්ගය, Invalidation මට්ටම් සහ perp funding rates අවධානය."
+  "impact_mark": "උදා: 1.5 / 10 — NOISE හෝ 8.5 / 10 — CRITICAL ALPHA",
+  "directional_bias": "NEUTRAL හෝ BULLISH හෝ BEARISH",
+  "expected_move": "±$0-$50 හෝ ±$500-$1,200",
+  "window": "ක්ෂණික තත්පර 60 තුළ හෝ විනාඩි 5-15 තුළ හෝ පැය 1-4 තුළ",
+  "bias_badge": "NEUTRAL හෝ BULLISH හෝ BEARISH",
+  "core_catalyst": "Tweet/News එකේ සම්පූර්ණ අන්තර්ගතය මත පදනම්ව, එහි සඳහන් සැබෑ කරුණු BTC වලට සෘජු macro/structural catalyst එකක් වන්නේ ඇයි/නොවන්නේ ඇයිද යන්න සවිස්තරාත්මකව සිංහලෙන්.",
+  "cvd_orderbook_impact": "Spot CVD (Cumulative Volume Delta), Orderbook bid/ask walls, Aggressive market orders සහ DXY සම්බන්ධතාවයට වන බලපෑම සිංහලෙන්.",
+  "liquidity_traps": "Short/Long liquidations, Fake Wick අවදානම සහ Liquidity Hunt/Sweep එකක් සිදුවිය හැකි ආකාරය සිංහලෙන්.",
+  "verdict": "නොසලකා හරින්න (IGNORE) හෝ LONG BIAS හෝ SHORT BIAS හෝ තහවුරු වන තුරු රැඳී සිටින්න (WAIT)",
+  "action_plan": "Bitcoin traders ලා 1m/5m timeframe තුළ ගත යුතු නිශ්චිත ක්‍රියාමාර්ගය, Invalidation මට්ටම් සහ perp funding rates නිරීක්ෂණය කළ යුතු ආකාරය පිරිසිදු සිංහලෙන්."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -174,6 +176,7 @@ HTML_UI = """<!DOCTYPE html>
             color: #ffffff;
             line-height: 1.6;
             margin-bottom: 18px;
+            word-break: break-word;
         }
         .metric-summary {
             font-size: 14px;
@@ -268,7 +271,8 @@ HTML_UI = """<!DOCTYPE html>
             const card = document.createElement("div");
             card.className = "card";
 
-            const bias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
+            const rawBias = (d.bias_badge || d.directional_bias || "NEUTRAL").toUpperCase();
+            const biasClass = rawBias.includes("BULL") ? "BULLISH" : (rawBias.includes("BEAR") ? "BEARISH" : "NEUTRAL");
 
             card.innerHTML = `
                 <div class="impact-hero">
@@ -276,7 +280,7 @@ HTML_UI = """<!DOCTYPE html>
                         <div class="impact-label">📌 IMPACT SCORE & EVALUATION</div>
                         <div class="impact-val">⚡ ${d.impact_mark}</div>
                     </div>
-                    <div class="badge-bias bias-${bias}">● ${bias}</div>
+                    <div class="badge-bias bias-${biasClass}">● ${d.directional_bias}</div>
                 </div>
 
                 <div class="full-news-title">${d.title}</div>
@@ -296,8 +300,8 @@ HTML_UI = """<!DOCTYPE html>
                 <div class="verdict-box">
                     <div class="verdict-title">⚠️ BTC Quant Trade Verdict:</div>
                     <div class="verdict-text">
-                        <strong>Verdict:</strong> ${d.verdict}<br>
-                        <strong>Action Plan:</strong> ${d.action_plan}
+                        <strong>තීන්දුව (Verdict):</strong> ${d.verdict}<br>
+                        <strong>ක්‍රියාකාරී සැලැස්ම (Action Plan):</strong> ${d.action_plan}
                     </div>
                 </div>
                 <div class="card-time">${new Date().toLocaleTimeString()}</div>
@@ -317,7 +321,7 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
-    prompt_payload = f"Analyze this breaking crypto/macro news specifically for BTC Orderbook and Price Action:\n{text[:2000]}"
+    prompt_payload = f"Analyze the full content of this breaking news/tweet in depth specifically regarding Bitcoin (BTC) Price Action and Orderbook mechanics:\n\n{text[:3500]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
@@ -327,22 +331,22 @@ async def analyze_news(text):
             ],
             response_format={"type": "json_object"},
             temperature=0.2,
-            max_tokens=1500
+            max_tokens=2000
         )
         return json.loads(completion.choices[0].message.content)
     except Exception as e:
         logger.error(f"Analysis error: {e}")
         return {
             "impact_mark": "1.5 / 10 — NOISE",
-            "directional_bias": "NEUTRAL",
+            "directional_bias": "මධ්‍යස්ථ (Neutral)",
             "expected_move": "±$0-$50",
-            "window": "Immediate 60s",
+            "window": "ක්ෂණික තත්පර 60 තුළ",
             "bias_badge": "NEUTRAL",
-            "core_catalyst": "සාමාන්‍ය පුවතක් වන අතර, Bitcoin (BTC) මිලට සෘජු macro catalyst එකක් නොවේ.",
-            "cvd_orderbook_impact": "Spot CVD වල significant divergence එකක් නොමැත. Aggressive market buys/sells නොමැති අතර DXY neutral වේ.",
-            "liquidity_traps": "Short/Long liquidation cascades සඳහා ඉඩක් නොමැත. Fake Wick අවදානමක් නොමැත.",
-            "verdict": "IGNORE",
-            "action_plan": "1m/5m timeframe තුළ මෙම news එක මත entry ගැනීම නොකළ යුතුය. BTC/USD spot liquidity සහ perp funding rates නිරීක්ෂණය කරන්න."
+            "core_catalyst": "මෙම පුවත සාමාන්‍ය වාර්තාවක් වන අතර, Bitcoin (BTC) මිල කෙරෙහි ක්ෂණික සාර්ව ආර්ථික (macro) බලපෑමක් ඇති කිරීමට තරම් ප්‍රබල නොවේ.",
+            "cvd_orderbook_impact": "Spot CVD වල කැපී පෙනෙන වෙනසක් නොමැත. ආක්‍රමණශීලී මිලදී ගැනීම් හෝ විකිණීම් වාර්තා නොවන අතර DXY මධ්‍යස්ථව පවතී.",
+            "liquidity_traps": "Short හෝ Long liquidation cascades සඳහා අවස්ථාවක් නොමැත. Fake Wick හෝ Liquidity Hunt අවදානමක් නොමැත.",
+            "verdict": "නොසලකා හරින්න (IGNORE)",
+            "action_plan": "Bitcoin traders ලා 1m හෝ 5m timeframe තුළ මෙම පුවත මත පදනම්ව හදිසි entries නොගත යුතුය. සුපුරුදු BTC/USD spot liquidity මට්ටම් සහ perp funding rates පිළිබඳව පමණක් අවධානයෙන් සිටින්න."
         }
 
 async def broadcast(item):
@@ -357,20 +361,25 @@ async def news_worker():
         raw_news = await news_queue.get()
         full_title = raw_news.get("full_title", "")
         body = raw_news.get("body", "")
-        content = f"Title: {full_title}\nDetails: {body}".strip()
         
+        # Pass the full detailed tweet text so the model deeply inspects what's inside
+        if body and body != full_title:
+            content = f"Title: {full_title}\nFull Tweet/Content Body: {body}"
+        else:
+            content = full_title
+            
         res = await analyze_news(content)
         payload = {
             "title": full_title,
             "impact_mark": res.get("impact_mark", "1.5 / 10 — NOISE"),
-            "directional_bias": res.get("directional_bias", "NEUTRAL"),
+            "directional_bias": res.get("directional_bias", "මධ්‍යස්ථ (Neutral)"),
             "expected_move": res.get("expected_move", "±$0-$50"),
-            "window": res.get("window", "Immediate 60s"),
+            "window": res.get("window", "ක්ෂණික තත්පර 60 තුළ"),
             "bias_badge": res.get("bias_badge", "NEUTRAL"),
             "core_catalyst": res.get("core_catalyst", ""),
             "cvd_orderbook_impact": res.get("cvd_orderbook_impact", ""),
             "liquidity_traps": res.get("liquidity_traps", ""),
-            "verdict": res.get("verdict", "IGNORE"),
+            "verdict": res.get("verdict", "නොසලකා හරින්න (IGNORE)"),
             "action_plan": res.get("action_plan", "")
         }
         await broadcast(payload)
