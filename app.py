@@ -16,22 +16,29 @@ connected_clients = set()
 news_history = []
 
 SYSTEM_PROMPT = """
-You are an institutional crypto quant analyst. Analyze breaking crypto news specifically for Bitcoin (BTC) impact.
-Write your analysis clearly and concisely in SINHALA (සිංහල භාෂාවෙන්).
+You are a Senior Quantitative Crypto Analyst & Market Microstructure Specialist at an institutional prop desk.
+Your objective is to provide a deep, high-conviction, professional analysis of breaking crypto news for Bitcoin (BTC) traders.
+You must output STRICTLY in clear, fluent, natural SINHALA (සිංහල). 
 
-Format strictly as:
-🎯 බලපෑම (Impact): [1-10]/10 - [ඉතා ඉහළ / මධ්‍යස්ථ / අඩු]
-📈 දිශාව (Bias): [Bullish / Bearish / Neutral]
-⚡ අපේක්ෂිත වෙනස: [උදා: ±$100-$300] | කාලය: [උදා: මිනිත්තු 1-5]
+Break down the analysis systematically into this exact format:
 
-📊 වෙළඳපල හා Orderbook:
-• හේතුව: (පුවතේ සෘජු බලපෑම සරල සිංහලෙන්)
-• Buyers/Sellers: (Volume & Liquidity තත්ත්වය)
-• උගුල් (Traps): (Fake pump/dump අවදානම)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 [බලපෑමේ මට්ටම]: 🔴 HIGH IMPACT / 🟡 MEDIUM IMPACT / 🟢 LOW IMPACT (NOISE)
+🎯 [Impact Score]: X / 10 | 📈 [දිශාව / Market Bias]: BULLISH / BEARISH / NEUTRAL
+⚡ [අපේක්ෂිත BTC චලනය]: ±$XXX - $XXX | [ක්‍රියාකාරී කාලය]: ක්ෂණික මිනිත්තු X-XX ඇතුළත
 
-💡 Quant තීරණය:
-• නිර්දේශය: [BUY / SELL / WAIT]
-• උපදෙස: (වෙළඳුන් කළ යුතු ක්‍රියාමාර්ගය)
+🏛️ 1. ඓතිහාසික පසුබිම හා සංසන්දනය (Historical Precedent):
+• අතීත චක්‍ර හැසිරීම: (මීට පෙර මෙවැනි සිදුවීම් - Regulatory, Exploit, ETF/Macro, Exchange listings - ආ විට BTC ප්‍රතිචාර දැක්වූයේ කෙසේද? උදා: Initial fake pump පසුව dump වීමක්ද, නැතහොත් trend එකක් හැදීමක්ද?)
+• උත්ප්‍රේරකයේ ප්‍රබලතාව: (මෙය සැබෑ Structural Change එකක්ද නැතහොත් කෙටි කාලීන Market Noise පමණක්ද?)
+
+📊 2. Orderbook & Microstructure විශ්ලේෂණය:
+• Spot CVD & Volume Flow: (Aggressive Market Buyers ද Sellers ද dominate කරන්නේ? Spot සහ Futures divergence එකක් ඇත්ද?)
+• Liquidity Traps & Hunt මට්ටම්: (Market Makers ලා විසින් Stop-hunt කිරීමට හෝ Long/Short liquidations cascade එකක් කිරීමට ඉඩ ඇති ප්‍රධාන කලාප)
+
+🎯 3. Institutional Trade Setup & Action Plan:
+• ක්‍රියාමාර්ගය: [AGGRESSIVE BUY / SCALP LONG / SHORT FADE / WAIT & WATCH]
+• Trade Execution Blueprint: (වෙළඳුන් ගත යුතු තීරණය, Key Levels, සහ Trade Setup එක අවලංගු වන Invalidation / Stop-Loss මට්ටම සරල පැහැදිලි සිංහලෙන්)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
 async def analyze_news(text):
@@ -44,8 +51,8 @@ async def analyze_news(text):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Breaking Crypto News:\n{text}"}
             ],
-            temperature=0.2,
-            max_tokens=550
+            temperature=0.15,
+            max_tokens=900
         )
         return completion.choices[0].message.content
     except Exception as e:
@@ -68,20 +75,17 @@ async def handle_incoming_news(raw_title):
     time_display = datetime.now().strftime("%I:%M:%S %p")
     news_id = f"news_{int(asyncio.get_event_loop().time() * 1000)}"
     
-    # 1. පුවත ආ සැනින් Browser එකට යැවීම (Instant UI update)
     initial_item = {
         "type": "news_pending",
         "id": news_id,
         "title": raw_title,
-        "analysis": "⏳ AI විශ්ලේෂණය සකස් වෙමින් පවතී (Analyzing with Quant Engine)...",
+        "analysis": "⚡ ගැඹුරු Quant සහ Historical විශ්ලේෂණය සකස් වෙමින් පවතී (Processing Orderbook & Precedents)...",
         "time": time_display
     }
     await broadcast(initial_item)
     
-    # 2. AI විශ්ලේෂණය ලබා ගැනීම
     analysis = await analyze_news(raw_title)
     
-    # 3. Analysis එක සම්පූර්ණ වූ පසු update කිරීම
     completed_item = {
         "type": "news_update",
         "id": news_id,
@@ -90,9 +94,8 @@ async def handle_incoming_news(raw_title):
         "time": time_display
     }
     
-    # History update
     news_history.insert(0, completed_item)
-    if len(news_history) > 20:
+    if len(news_history) > 30:
         news_history.pop()
         
     await broadcast(completed_item)
@@ -125,75 +128,80 @@ HTML_PAGE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA QUANT // CRYPTO TERMINAL</title>
+    <title>ALPHA QUANT // ADVANCED CRYPTO TERMINAL</title>
     <style>
         body {
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: #080b11;
+            color: #d8e2ed;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Sinhala", sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 24px;
             display: flex;
             justify-content: center;
+            -webkit-font-smoothing: antialiased;
         }
-        .container { width: 100%; max-width: 950px; }
+        .container { width: 100%; max-width: 1020px; }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #30363d;
-            padding-bottom: 15px;
-            margin-bottom: 25px;
+            border-bottom: 1px solid #1c2436;
+            padding-bottom: 18px;
+            margin-bottom: 26px;
         }
-        .title { font-size: 24px; font-weight: 800; color: #58a6ff; letter-spacing: 1px; }
+        .title { font-size: 26px; font-weight: 800; color: #38bdf8; letter-spacing: 0.8px; }
         .live-badge {
-            background: rgba(46, 160, 67, 0.2);
-            color: #3fb950;
-            border: 1px solid #2ea043;
-            padding: 6px 14px;
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid #22c55e;
+            padding: 7px 18px;
             border-radius: 20px;
             font-size: 14px;
-            font-weight: bold;
+            font-weight: 700;
         }
         .news-card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            padding: 24px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            background: #0f1523;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 26px;
+            margin-bottom: 26px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+            transition: border-color 0.25s ease;
         }
+        .news-card:hover { border-color: #38bdf8; }
         .news-raw {
-            font-size: 18px;
-            font-weight: 600;
-            color: #f0f6fc;
-            line-height: 1.6;
-            margin-bottom: 18px;
-            border-left: 4px solid #58a6ff;
-            padding-left: 14px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.55;
+            margin-bottom: 20px;
+            border-left: 5px solid #38bdf8;
+            padding-left: 16px;
         }
         .analysis-box {
-            background: #0d1117;
-            border: 1px solid #21262d;
-            border-radius: 8px;
-            padding: 18px;
-            font-size: 16px;
-            line-height: 1.8;
-            color: #e6edf3;
+            background: #090d16;
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 22px;
+            font-size: 18px;
+            line-height: 1.95;
+            color: #f1f5f9;
             white-space: pre-wrap;
+            font-weight: 400;
+            letter-spacing: 0.2px;
         }
-        .timestamp { font-size: 13px; color: #8b949e; margin-top: 12px; text-align: right; }
+        .timestamp { font-size: 14px; color: #64748b; margin-top: 16px; text-align: right; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="title">⚡ ALPHA QUANT TERMINAL</div>
+            <div class="title">⚡ ALPHA QUANT // PRO NEWS TERMINAL</div>
             <div class="live-badge" id="status">● LIVE STREAMING</div>
         </div>
         <div id="feed">
-            <div id="empty-msg" style="text-align:center; padding: 40px; color:#8b949e; font-size:16px;">
-                සජීවී පුවත් බලාපොරොත්තුවෙන් පවතී...
+            <div id="empty-msg" style="text-align:center; padding: 60px; color:#64748b; font-size:18px;">
+                සජීවී Institutional පුවත් සහ Quant දත්ත බලාපොරොත්තුවෙන් පවතී...
             </div>
         </div>
     </div>
@@ -222,13 +230,13 @@ HTML_PAGE = """
 
             ws.onclose = () => {
                 document.getElementById('status').innerText = '○ RECONNECTING...';
-                document.getElementById('status').style.color = '#e3b341';
+                document.getElementById('status').style.color = '#f59e0b';
                 setTimeout(connect, 2000);
             };
 
             ws.onopen = () => {
                 document.getElementById('status').innerText = '● LIVE STREAMING';
-                document.getElementById('status').style.color = '#3fb950';
+                document.getElementById('status').style.color = '#4ade80';
             };
         }
 
