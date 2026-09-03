@@ -9,7 +9,8 @@ from openai import AsyncOpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("CryptoNewsHub")
 
-API_KEY = os.environ.get("SILICONFLOW_API_KEY", os.environ.get("GROQ_API_KEY", "")).strip()
+# Direct Hardcoded API Key to bypass Railway Variable whitespace bugs
+API_KEY = "sk-pelmrylphluuoklrexttdcsvmnshpklddvzecrcmfzbbzthu"
 
 client = AsyncOpenAI(
     api_key=API_KEY,
@@ -98,8 +99,6 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(full_text):
-    if not API_KEY:
-        return "BREAKING", "LOW", "⚠️ API Key සකසා නැත."
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
