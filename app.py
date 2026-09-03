@@ -82,7 +82,6 @@ HTML_UI = """<!DOCTYPE html>
             max-width: 960px;
             margin: 0 auto;
         }
-        /* Sleek Modern Top Bar */
         .terminal-nav {
             background: linear-gradient(180deg, #101726 0%, #0c121e 100%);
             border: 1px solid #1e293b;
@@ -360,7 +359,6 @@ HTML_UI = """<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <!-- Re-designed Modern Executive Header -->
         <div class="terminal-nav">
             <div class="nav-brand">
                 <div class="brand-icon">⚡</div>
@@ -377,7 +375,7 @@ HTML_UI = """<!DOCTYPE html>
 
         <div class="grid" id="news-container">
             <div id="wait-placeholder" style="text-align:center; padding:60px; color:#475569; font-size:14px; font-weight:700;">
-                📡 CONNECTED TO GLOBAL MACRO FEED // WAITING FOR CATALYST...
+                📡 CONNECTED TO QUANTITATIVE FEED // WAITING FOR CATALYST...
             </div>
         </div>
 
