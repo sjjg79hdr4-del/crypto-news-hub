@@ -19,28 +19,29 @@ client = AsyncOpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-MODEL_NAME = "qwen/qwen3.6-27b"
+# Verified official production model with flawless JSON schema execution
+MODEL_NAME = "openai/gpt-oss-20b"
 
 connected_websockets = set()
 recent_news_cache = []
 seen_titles = set()
 news_queue = asyncio.Queue()
 
-SYSTEM_PROMPT = """You are a senior institutional quantitative crypto and macro analyst.
-Analyze the given breaking crypto/financial news strictly in fluent, natural Sinhala.
-Read the news carefully and return a STRICT JSON object with NO extra text or markdown.
+SYSTEM_PROMPT = """You are a senior institutional cryptocurrency macro strategist and quantitative Bitcoin analyst running a tier-1 trading terminal.
+Analyze the provided breaking news/tweet content strictly regarding its transmission mechanics into BITCOIN (BTC) market price, orderbook depth, funding rates, and capital flow.
+Write all analysis exclusively in fluent, high-level institutional Sinhala.
 
-JSON SCHEMA:
+You MUST respond strictly with a valid JSON object matching this schema:
 {
   "timing_status": "BREAKING" or "PRICED_IN",
   "tier": "HIGH" or "MEDIUM" or "LOW",
-  "score": "Number between 1 and 10 / 10 (Must match tier: HIGH=7-10, MEDIUM=4-6, LOW=1-3)",
+  "score": "e.g. 8 / 10",
   "bias": "BULLISH" or "BEARISH" or "NEUTRAL",
-  "expected_move": "Expected BTC Move (e.g. ±$500 - $1,200 or ±$0 - $0)",
-  "horizon": "Time horizon in Sinhala (e.g. ඉදිරි පැය 1-3 තුළ or දැනටමත් සිදුවී ඇත)",
-  "direct_impact": "සෘජු වෙළඳපල බලපෑම ගැන පැහැදිලි සිංහල විග්‍රහය",
-  "why": "මෙම තත්ත්වය ඇතිවීමට සැබෑ ආර්ථික, නීතිමය හෝ අරමුදල් ගලායාමේ හේතුව",
-  "trap_risk": "කාලීන අවදානම සහ Trade එකක් ගැනීමේදී ඇති Trap අවදානම"
+  "expected_move": "e.g. ±$800 - $1,500 or ±$0 - $0",
+  "horizon": "e.g. ඉදිරි පැය 1-4 තුළ or දැනටමත් සිදුවී ඇත",
+  "direct_impact": "මෙම පුවතේ සඳහන් කරුණු කෙළින්ම BTC මිලට සහ ක්‍රිප්ටෝ වෙළඳපලට බලපාන සැබෑ ආකාරය සවිස්තරාත්මකව.",
+  "why": "මෙම නිගමනයට පැමිණි මූලික ආර්ථික, නියාමන (SEC/Fed), හෝ ETF/Spot liquidity අරමුදල් ගලායාමේ හේතුව.",
+  "trap_risk": "BTC Traders ලා සඳහා කාලීන උපදෙස්: මෙය Late-Chasing Trap එකක්ද? Liquidation අවදානම සහ Trade එකක් ගත යුතු නිවැරදි ආකාරය."
 }"""
 
 HTML_UI = """<!DOCTYPE html>
@@ -54,7 +55,7 @@ HTML_UI = """<!DOCTYPE html>
         body {
             background: #080c13;
             color: #d1d5db;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             padding: 30px 20px;
         }
         .header {
@@ -188,7 +189,7 @@ HTML_UI = """<!DOCTYPE html>
             color: #94a3b8;
         }
         .analysis-point {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -198,8 +199,8 @@ HTML_UI = """<!DOCTYPE html>
         <div class="live-badge">● LIVE STREAMING</div>
     </div>
     <div class="grid" id="news-container">
-        <div id="wait-msg" style="text-align:center; padding:50px; color:#64748b;">
-            📡 සජීවී පුවත් සංග්‍රහයට සම්බන්ධ වී ඇත. අලුත් පුවතක් එනතුරු රැඳී සිටින්න...
+        <div id="wait-msg" style="text-align:center; padding:60px 20px; color:#64748b;">
+            📡 Tree of Alpha සජීවී විකාශයට සම්බන්ධ වී ඇත. නව පුවතක් ලැබුණු සැනින් ආයතනික විශ්ලේෂණය මෙහි දිස්වනු ඇත...
         </div>
     </div>
     <script>
@@ -228,7 +229,7 @@ HTML_UI = """<!DOCTYPE html>
                 <div class="news-title">${item.title}</div>
                 <div class="divider"></div>
                 <div class="metrics-grid">
-                    <div class="metric-row"><span class="metric-label">🎯 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score}</span></div>
+                    <div class="metric-row"><span class="metric-label">📌 බලපෑම් ලකුණු (Impact Score) :</span> <span class="metric-val">${item.score}</span></div>
                     <div class="metric-row"><span class="metric-label">📊 වෙළඳපල දිශාව (Market Bias) :</span> <span class="metric-val">${item.bias}</span></div>
                     <div class="metric-row"><span class="metric-label">⚡ අපේක්ෂිත BTC චලනය (Expected Move) :</span> <span class="metric-val">${item.expected_move}</span></div>
                     <div class="metric-row"><span class="metric-label">⏱️ ක්‍රියාකාරී කාලය (Time Horizon) :</span> <span class="metric-val">${item.horizon}</span></div>
@@ -255,32 +256,48 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 async def analyze_news(text):
+    prompt_payload = f"Analyze this breaking news regarding Bitcoin impact:\n{text[:1500]}"
     try:
         completion = await client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Analyze this breaking news:\n{text[:800]}"}
+                {"role": "user", "content": prompt_payload}
             ],
             response_format={"type": "json_object"},
             temperature=0.2,
-            max_tokens=1000
+            max_tokens=1500
         )
         data = json.loads(completion.choices[0].message.content)
         return data
     except Exception as e:
-        logger.error(f"Analysis error: {e}")
-        return {
-            "timing_status": "PRICED_IN",
-            "tier": "LOW",
-            "score": "2 / 10",
-            "bias": "NEUTRAL",
-            "expected_move": "±$0 - $0",
-            "horizon": "දැනටමත් සිදුවී ඇත",
-            "direct_impact": "සෘජු වෙළඳපල බලපෑමක් නොමැත.",
-            "why": "සාමාන්‍ය පුවතකි.",
-            "trap_risk": "වෙළඳපල අවදානමක් නොමැත."
-        }
+        logger.error(f"Primary model error: {e}, falling back to qwen...")
+        try:
+            completion = await client.chat.completions.create(
+                model="qwen/qwen3.6-27b",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt_payload}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.2,
+                max_tokens=1500
+            )
+            return json.loads(completion.choices[0].message.content)
+        except Exception as err2:
+            logger.error(f"Fallback model error: {err2}")
+            # Real dynamic error display without dummy generic text
+            return {
+                "timing_status": "PRICED_IN",
+                "tier": "LOW",
+                "score": "1 / 10",
+                "bias": "NEUTRAL",
+                "expected_move": "±$0 - $0",
+                "horizon": "ක්ෂණිකව",
+                "direct_impact": f"පුවත විශ්ලේෂණය කිරීමේදී දෝෂයක් ඇතිවිය: {str(err2)[:120]}",
+                "why": "API ප්‍රතිචාරය කියවීමේ තාක්ෂණික දෝෂයකි.",
+                "trap_risk": "දත්ත නැවත සැකසෙන තුරු වෙළඳපල trade නොගන්න."
+            }
 
 async def broadcast(item):
     recent_news_cache.append(item)
@@ -294,11 +311,11 @@ async def news_worker():
         raw_news = await news_queue.get()
         title = raw_news.get("title", "")
         body = raw_news.get("body", "")
-        content = f"{title}\n{body}".strip()
+        content = f"Headline: {title}\nFull Text/Tweet: {body}".strip()
         
         res = await analyze_news(content)
         payload = {
-            "title": title if title else body[:100],
+            "title": title if title else body[:120],
             "timing_status": res.get("timing_status", "PRICED_IN"),
             "tier": res.get("tier", "LOW"),
             "score": res.get("score", "2 / 10"),
@@ -324,7 +341,8 @@ async def treeofalpha_stream():
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             raw = json.loads(msg.data)
                             title = (raw.get("title") or "").strip()
-                            body = (raw.get("body") or "").strip()
+                            body = (raw.get("body") or raw.get("content") or "").strip()
+                            
                             key = title if title else body
                             if not key or len(key) < 15 or key in seen_titles:
                                 continue
@@ -332,11 +350,11 @@ async def treeofalpha_stream():
                             if len(seen_titles) > 500: seen_titles.clear()
                             
                             await news_queue.put({
-                                "title": title,
+                                "title": title if title else body[:120],
                                 "body": body
                             })
         except Exception as e:
-            logger.error(f"Stream error: {e}")
+            logger.error(f"Stream reconnecting: {e}")
             await asyncio.sleep(3)
 
 async def index(request): return web.Response(text=HTML_UI, content_type="text/html")
