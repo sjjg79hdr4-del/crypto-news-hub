@@ -37,7 +37,7 @@ async def analyze_news(text):
         return "⚠️ GROQ_API_KEY සකසා නැත."
     try:
         completion = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Breaking Crypto News:\n{text}"}
