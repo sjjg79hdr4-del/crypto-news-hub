@@ -16,48 +16,68 @@ connected_clients = set()
 news_history = []
 
 SYSTEM_PROMPT = """
-You are a Senior Quantitative Crypto Analyst & Market Microstructure Specialist at an institutional prop desk.
-Your objective is to provide a deep, high-conviction, professional analysis of breaking crypto news for Bitcoin (BTC) traders.
-You must output STRICTLY in clear, fluent, natural SINHALA (සිංහල). 
+You are a Lead Quantitative Macro Crypto Strategist at a Tier-1 Prop Trading Desk.
+Analyze breaking crypto and macro news (CPI, FOMC, Fed Rates, ETF flows, Hacks, Regulatory actions, Exchange listings) specifically for Bitcoin (BTC) price action.
 
-Break down the analysis systematically into this exact format:
+When analyzing Macro data (like CPI, Inflation, Jobs, Interest Rates):
+- If CPI is HIGHER than expected: Explain why this is Bearish (Fed keeps rates high -> DXY up -> liquidity drains from BTC).
+- If CPI is LOWER than expected: Explain why this is Bullish (Rate cut odds up -> DXY down -> liquidity rushes to BTC).
+- Always explain the Fundamental "Why" (ඇයි එහෙම වුණේ කියන හේතුව).
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔥 [බලපෑමේ මට්ටම]: 🔴 HIGH IMPACT / 🟡 MEDIUM IMPACT / 🟢 LOW IMPACT (NOISE)
-🎯 [Impact Score]: X / 10 | 📈 [දිශාව / Market Bias]: BULLISH / BEARISH / NEUTRAL
+You must start the analysis with EXACTLY this header line so the UI can style the impact badge:
+IMPACT_TIER: [HIGH | MEDIUM | LOW]
+
+Then write the rest strictly in clear, natural, fluent SINHALA (සිංහල භාෂාවෙන්) using this format:
+
+🎯 [Impact Score]: X / 10 | 📈 [දිශාව / Market Bias]: BULLISH (ඉහළට) / BEARISH (පහළට) / NEUTRAL
 ⚡ [අපේක්ෂිත BTC චලනය]: ±$XXX - $XXX | [ක්‍රියාකාරී කාලය]: ක්ෂණික මිනිත්තු X-XX ඇතුළත
 
-🏛️ 1. ඓතිහාසික පසුබිම හා සංසන්දනය (Historical Precedent):
-• අතීත චක්‍ර හැසිරීම: (මීට පෙර මෙවැනි සිදුවීම් - Regulatory, Exploit, ETF/Macro, Exchange listings - ආ විට BTC ප්‍රතිචාර දැක්වූයේ කෙසේද? උදා: Initial fake pump පසුව dump වීමක්ද, නැතහොත් trend එකක් හැදීමක්ද?)
-• උත්ප්‍රේරකයේ ප්‍රබලතාව: (මෙය සැබෑ Structural Change එකක්ද නැතහොත් කෙටි කාලීන Market Noise පමණක්ද?)
+📊 1. ගැඹුරු වෙළඳපල හා Orderbook විශ්ලේෂණය (Deep Microstructure & Macro):
+• සෘජු බලපෑම (Direct Impact): (BTC මිලට ක්ෂණිකව සිදුවන දේ සහ දිශාව)
+• ඇයි මෙහෙම වුණේ? (The Fundamental "Why"): (මූල්‍යමය හා ආර්ථික හේතුව - උදා: CPI, Fed, DXY, Liquidity පිටතට යාම හෝ පැමිණීම සරල සිංහලෙන්)
+• Spot CVD, Liquidity Sweep & Traps: (Fake Wick, Stop Hunt උගුල්, Orderbook එකේ Buyers/Sellers හැසිරීම සහ Liquidation කලාප)
 
-📊 2. Orderbook & Microstructure විශ්ලේෂණය:
-• Spot CVD & Volume Flow: (Aggressive Market Buyers ද Sellers ද dominate කරන්නේ? Spot සහ Futures divergence එකක් ඇත්ද?)
-• Liquidity Traps & Hunt මට්ටම්: (Market Makers ලා විසින් Stop-hunt කිරීමට හෝ Long/Short liquidations cascade එකක් කිරීමට ඉඩ ඇති ප්‍රධාන කලාප)
+🏛️ 2. ඓතිහාසික පසුබිම හා සංසන්දනය (Historical Precedent):
+• අතීත චක්‍ර හැසිරීම: (මීට පෙර මෙවැනි අවස්ථාවලදී BTC හැසිරුණු ආකාරය)
+• සත්‍ය ප්‍රතිඵලය: (පළමු ප්‍රතිචාරය Fake wick එකක්ද, නැතහොත් Trend Reversal එකක්ද?)
 
-🎯 3. Institutional Trade Setup & Action Plan:
-• ක්‍රියාමාර්ගය: [AGGRESSIVE BUY / SCALP LONG / SHORT FADE / WAIT & WATCH]
-• Trade Execution Blueprint: (වෙළඳුන් ගත යුතු තීරණය, Key Levels, සහ Trade Setup එක අවලංගු වන Invalidation / Stop-Loss මට්ටම සරල පැහැදිලි සිංහලෙන්)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 3. Institutional Trade Setup & Action Plan:
+• ක්‍රියාමාර්ගය: [AGGRESSIVE BUY / SCALP SHORT / FADE THE PUMP/DUMP / WAIT & WATCH]
+• Trade Execution Blueprint: (ගත යුතු ක්‍රියාමාර්ගය, Key Levels සහ Invalidation මට්ටම)
 """
 
-async def analyze_news(text):
+async def analyze_news(full_text):
     if not client:
-        return "⚠️ GROQ_API_KEY සකසා නැත."
+        return "LOW", "⚠️ GROQ_API_KEY සකසා නැත."
     try:
         completion = await client.chat.completions.create(
             model="qwen/qwen3.8-27b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Breaking Crypto News:\n{text}"}
+                {"role": "user", "content": f"Full Crypto/Macro Breaking Event:\n{full_text}"}
             ],
             temperature=0.15,
-            max_tokens=900
+            max_tokens=1000
         )
-        return completion.choices[0].message.content
+        content = completion.choices[0].message.content.strip()
+        
+        tier = "LOW"
+        analysis_body = content
+        if "IMPACT_TIER:" in content:
+            parts = content.split("IMPACT_TIER:", 1)[1].split("\n", 1)
+            raw_tier = parts[0].strip().upper()
+            if "HIGH" in raw_tier:
+                tier = "HIGH"
+            elif "MEDIUM" in raw_tier:
+                tier = "MEDIUM"
+            else:
+                tier = "LOW"
+            analysis_body = parts[1].strip() if len(parts) > 1 else ""
+            
+        return tier, analysis_body
     except Exception as e:
         logger.error(f"Groq API Error: {e}")
-        return f"විශ්ලේෂණ දෝෂයකි: {str(e)}"
+        return "LOW", f"විශ්ලේෂණ දෝෂයකි: {str(e)}"
 
 async def broadcast(data_dict):
     if not connected_clients:
@@ -71,25 +91,29 @@ async def broadcast(data_dict):
             dead.add(ws)
     connected_clients.difference_update(dead)
 
-async def handle_incoming_news(raw_title):
+async def handle_incoming_news(full_content, source_name):
     time_display = datetime.now().strftime("%I:%M:%S %p")
     news_id = f"news_{int(asyncio.get_event_loop().time() * 1000)}"
     
     initial_item = {
         "type": "news_pending",
         "id": news_id,
-        "title": raw_title,
-        "analysis": "⚡ ගැඹුරු Quant සහ Historical විශ්ලේෂණය සකස් වෙමින් පවතී (Processing Orderbook & Precedents)...",
+        "content": full_content,
+        "source": source_name,
+        "tier": "PENDING",
+        "analysis": "⚡ ගැඹුරු Macro, Orderbook සහ 'ඇයි එහෙම වුණේ' හේතුව සකස් වෙමින් පවතී...",
         "time": time_display
     }
     await broadcast(initial_item)
     
-    analysis = await analyze_news(raw_title)
+    tier, analysis = await analyze_news(full_content)
     
     completed_item = {
         "type": "news_update",
         "id": news_id,
-        "title": raw_title,
+        "content": full_content,
+        "source": source_name,
+        "tier": tier,
         "analysis": analysis,
         "time": time_display
     }
@@ -111,9 +135,13 @@ async def treeofalpha_stream():
                         if msg.type == WSMsgType.TEXT:
                             try:
                                 data = json.loads(msg.data)
-                                title = data.get("title") or data.get("body") or ""
-                                if title:
-                                    asyncio.create_task(handle_incoming_news(title))
+                                title = data.get("title", "")
+                                body = data.get("body", "")
+                                source = data.get("source", "Crypto Feed")
+                                full_text = f"{title}\n\n{body}".strip() if body else title.strip()
+                                
+                                if full_text:
+                                    asyncio.create_task(handle_incoming_news(full_text, source))
                             except Exception as parse_err:
                                 logger.error(f"JSON Parse err: {parse_err}")
                         elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
@@ -128,10 +156,10 @@ HTML_PAGE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA QUANT // ADVANCED CRYPTO TERMINAL</title>
+    <title>ALPHA QUANT // PRO NEWS TERMINAL</title>
     <style>
         body {
-            background-color: #080b11;
+            background-color: #070a0f;
             color: #d8e2ed;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Sinhala", sans-serif;
             margin: 0;
@@ -140,7 +168,7 @@ HTML_PAGE = """
             justify-content: center;
             -webkit-font-smoothing: antialiased;
         }
-        .container { width: 100%; max-width: 1020px; }
+        .container { width: 100%; max-width: 1040px; }
         .header {
             display: flex;
             justify-content: space-between;
@@ -160,27 +188,63 @@ HTML_PAGE = """
             font-weight: 700;
         }
         .news-card {
-            background: #0f1523;
+            background: #0e1420;
             border: 1px solid #1e293b;
-            border-radius: 12px;
-            padding: 26px;
-            margin-bottom: 26px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.55);
-            transition: border-color 0.25s ease;
+            border-radius: 14px;
+            padding: 0;
+            margin-bottom: 28px;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+            overflow: hidden;
         }
-        .news-card:hover { border-color: #38bdf8; }
-        .news-raw {
+        
+        /* උඩින්ම එන ලොකු Impact Title Bar එක */
+        .impact-title-bar {
+            padding: 14px 24px;
+            font-size: 19px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .tier-HIGH {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.1) 100%);
+            color: #f87171;
+            border-left: 6px solid #ef4444;
+            box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.2);
+        }
+        .tier-MEDIUM {
+            background: linear-gradient(90deg, rgba(245, 158, 11, 0.25) 0%, rgba(180, 83, 9, 0.1) 100%);
+            color: #fbbf24;
+            border-left: 6px solid #f59e0b;
+        }
+        .tier-LOW {
+            background: linear-gradient(90deg, rgba(148, 163, 184, 0.15) 0%, rgba(71, 85, 105, 0.05) 100%);
+            color: #94a3b8;
+            border-left: 6px solid #64748b;
+        }
+        .tier-PENDING {
+            background: #161f30;
+            color: #38bdf8;
+            border-left: 6px solid #38bdf8;
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+        .news-content {
             font-size: 20px;
             font-weight: 700;
             color: #ffffff;
-            line-height: 1.55;
+            line-height: 1.6;
             margin-bottom: 20px;
-            border-left: 5px solid #38bdf8;
-            padding-left: 16px;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         .analysis-box {
-            background: #090d16;
-            border: 1px solid #1e293b;
+            background: #070a0f;
+            border: 1px solid #1a2233;
             border-radius: 10px;
             padding: 22px;
             font-size: 18px;
@@ -190,18 +254,24 @@ HTML_PAGE = """
             font-weight: 400;
             letter-spacing: 0.2px;
         }
-        .timestamp { font-size: 14px; color: #64748b; margin-top: 16px; text-align: right; }
+        .timestamp {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="title">⚡ ALPHA QUANT // PRO NEWS TERMINAL</div>
+            <div class="title">⚡ ALPHA QUANT // PRO MACRO TERMINAL</div>
             <div class="live-badge" id="status">● LIVE STREAMING</div>
         </div>
         <div id="feed">
             <div id="empty-msg" style="text-align:center; padding: 60px; color:#64748b; font-size:18px;">
-                සජීවී Institutional පුවත් සහ Quant දත්ත බලාපොරොත්තුවෙන් පවතී...
+                සජීවී Institutional පුවත් සහ Macro දත්ත බලාපොරොත්තුවෙන් පවතී...
             </div>
         </div>
     </div>
@@ -240,17 +310,33 @@ HTML_PAGE = """
             };
         }
 
+        function getHeaderHtml(tier) {
+            if (tier === 'HIGH') return '<span>🔥 🔴 HIGH IMPACT EVENT</span> <span>INSTITUTIONAL ALERT</span>';
+            if (tier === 'MEDIUM') return '<span>⚡ 🟡 MEDIUM IMPACT EVENT</span> <span>VOLATILITY EXPECTED</span>';
+            if (tier === 'LOW') return '<span>🟢 LOW IMPACT (MARKET NOISE)</span> <span>ROUTINE FLOW</span>';
+            return '<span>⏳ ANALYZING IMPACT...</span> <span>QUANT ENGINE</span>';
+        }
+
         function renderCard(data, prepend = false) {
             let existing = document.getElementById(data.id);
             if (existing) return;
 
+            const tier = data.tier || 'PENDING';
             const card = document.createElement('div');
             card.className = 'news-card';
             card.id = data.id || ('temp_' + Math.random());
             card.innerHTML = `
-                <div class="news-raw">${data.title}</div>
-                <div class="analysis-box" id="box_${data.id}">${data.analysis}</div>
-                <div class="timestamp">${data.time || ''}</div>
+                <div class="impact-title-bar tier-${tier}" id="header_${data.id}">
+                    ${getHeaderHtml(tier)}
+                </div>
+                <div class="card-body">
+                    <div class="news-content">${data.content}</div>
+                    <div class="analysis-box" id="box_${data.id}">${data.analysis}</div>
+                    <div class="timestamp">
+                        <span>Source: ${data.source || 'Macro Feed'}</span>
+                        <span>${data.time || ''}</span>
+                    </div>
+                </div>
             `;
             if (prepend) {
                 feed.insertBefore(card, feed.firstChild);
@@ -260,7 +346,14 @@ HTML_PAGE = """
         }
 
         function updateCard(data) {
+            const headerBox = document.getElementById(`header_${data.id}`);
             const box = document.getElementById(`box_${data.id}`);
+            const tier = data.tier || 'LOW';
+
+            if (headerBox) {
+                headerBox.className = `impact-title-bar tier-${tier}`;
+                headerBox.innerHTML = getHeaderHtml(tier);
+            }
             if (box) {
                 box.innerText = data.analysis;
             } else {
